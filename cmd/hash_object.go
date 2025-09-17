@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -25,7 +24,6 @@ var hashObjCmd = &cobra.Command{
 		rootDir := filepath.Dir(pgitDir)
 		filename := args[0]
 		path := filepath.Join(rootDir, filename)
-		fmt.Println("path:", path)
 		f, err := os.Open(path)
 		if err != nil {
 			return err

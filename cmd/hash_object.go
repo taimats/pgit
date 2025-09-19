@@ -17,13 +17,18 @@ var hashObjCmd = &cobra.Command{
 	Short: "save a hashed-object",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		pgitDir := PgitDirPath()
-		if pgitDir == "" {
-			return errors.New("need initializing pgit beforehand")
+		objdir, err := AbsObjDirPath()
+		if err != nil {
+			return err
 		}
-		rootDir := filepath.Dir(pgitDir)
+		if _, err := os.Stat(objdir); err != nil {
+			return errors.New("need initializing first")
+		}
 		filename := args[0]
-		path := filepath.Join(rootDir, filename)
+		path, err := filepath.Abs(filename)
+		if err != nil {
+			return err
+		}
 		f, err := os.Open(path)
 		if err != nil {
 			return err
@@ -33,26 +38,27 @@ var hashObjCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		oid, err := hashObject(content)
+		oid := hashObject(content)
 		if err != nil {
 			return err
 		}
+		newfile, err := os.Create(filepath.Join(objdir, oid))
+		if err != nil {
+			return err
+		}
+		defer newfile.Close()
+		newfile.Write(content)
+
 		log.Printf("saved a hashed-object!!\noid: %s\n", oid)
 		return nil
 	},
 }
 
-// oid is object ID.
-func hashObject(data []byte) (oid string, err error) {
+// oid is an so-called object ID.
+func hashObject(data []byte) (oid string) {
 	s := sha1.Sum(data)
 	oid = hex.EncodeToString(s[:])
-	f, err := os.OpenFile(filepath.Join(RootDir, ObjDir, oid), os.O_RDWR|os.O_CREATE, 0600)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	f.WriteString(oid)
-	return oid, nil
+	return oid
 }
 
 func init() {

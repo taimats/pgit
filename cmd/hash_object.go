@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -11,6 +12,52 @@ import (
 
 	"github.com/spf13/cobra"
 )
+
+var (
+	//identifier for object type
+	identBlob = []byte{'b', 0x00}
+)
+
+type Object struct {
+	objType string
+	ident   []byte //identifier
+	data    []byte
+}
+
+func NewObject(objType string, ident []byte, data []byte) *Object {
+	return &Object{
+		objType: objType,
+		ident:   ident,
+		data:    data,
+	}
+}
+
+func (o *Object) encode() []byte {
+	var buf bytes.Buffer
+	buf.Write([]byte(o.objType))
+	buf.Write(o.ident)
+	buf.Write(o.data)
+	return buf.Bytes()
+}
+
+func (o *Object) Type() string {
+	return o.objType
+}
+func (o *Object) Indent() []byte {
+	return o.ident
+}
+func (o *Object) Data() []byte {
+	return o.data
+}
+
+func decode(ident []byte, b []byte) (*Object, error) {
+	sep := bytes.Split(b, ident)
+	if len(sep) != 2 {
+		return nil, errors.New("invalid input: a given object in byte is not valid for Object structure")
+	}
+	obj := NewObject(string(sep[0]), ident, sep[1])
+	return obj, nil
+}
 
 var hashObjCmd = &cobra.Command{
 	Use:   "hash-object",
@@ -61,6 +108,10 @@ func hashObject(data []byte) (oid string) {
 	return oid
 }
 
+var objType string
+
 func init() {
 	rootCmd.AddCommand(hashObjCmd)
+
+	hashObjCmd.Flags().StringP("type", "t", objType, "specify a object type")
 }

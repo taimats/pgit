@@ -1,9 +1,10 @@
 package cmd_test
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,107 +13,8 @@ import (
 	"github.com/taimats/pgit/cmd"
 )
 
-type outputFile struct {
-	fileType string // dir or file
-	path     string // "/dir/file.txt" etc
-}
-
-func newoutputFile(fileType string, path string) *outputFile {
-	return &outputFile{fileType: fileType, path: path}
-}
-
-func (of *outputFile) fileInfo() os.FileInfo {
-	fi, err := os.Stat(of.path)
-	if err != nil {
-		return nil
-	}
-	return fi
-}
-
-func (of *outputFile) newFile() (*os.File, error) {
-	if of.fileType == "dir" {
-		return nil, errors.New("Cannot genertate a file: this filetype is \"directory\"")
-	}
-	f, err := os.Create(of.path)
-	if err != nil {
-		return nil, err
-	}
-	return f, nil
-}
-
-func (of *outputFile) newDir() error {
-	if of.fileType == "file" {
-		return errors.New("Cannot genertate a directory: this filetype is \"file\"")
-	}
-	return os.MkdirAll(of.path, 0750)
-}
-
-func (of *outputFile) remove() error {
-	if err := os.RemoveAll(of.path); err != nil {
-		return err
-	}
-	return nil
-}
-
-type testCase struct {
-	desc    string //description
-	args    []string
-	genFile bool
-	files   []*outputFile
-	hasErr  bool
-}
-
-// Testing the main behavior of command in a normal setting
-func testCmd(t *testing.T, tc testCase, cmd *cobra.Command) {
-	t.Cleanup(
-		func() {
-			if len(tc.files) > 0 {
-				for _, f := range tc.files {
-					if err := f.remove(); err != nil {
-						t.Log(err)
-					}
-				}
-			}
-		},
-	)
-
-	err := cmd.RunE(cmd, tc.args)
-
-	if tc.genFile {
-		for _, f := range tc.files {
-			fi := f.fileInfo()
-			if fi == nil {
-				t.Error("some file should be generated: (got: nil)")
-			}
-			switch f.fileType {
-			case "dir":
-				if !fi.IsDir() {
-					t.Errorf("A generated file should be a directory: (got: %s)", fi.Name())
-				}
-			case "file":
-				if fi.IsDir() {
-					t.Errorf("A generated file should not be a directory: (got: %s)", fi.Name())
-				}
-			}
-			if fi.Mode().Perm() != 511 {
-				t.Errorf(
-					"%s dir's permission is not valid: (got: %d, want: %d)",
-					fi.Name(),
-					fi.Mode().Perm(),
-					os.FileMode(0511),
-				)
-			}
-		}
-	}
-	if tc.hasErr {
-		if err == nil {
-			t.Errorf("error should not be nil")
-		}
-	}
-}
-
-// creates all necessary directories and returns a fixed path(= "/rootDir/.pgit/objects")
-func initPgitForTest(t *testing.T) string {
+// creates all necessary directories and returns a fixed path(= "...rootDir/.pgit/objects")
+func initPgitForTest(t *testing.T) (objDirPath string) {
 	t.Helper()
 
 	path, err := cmd.AbsObjDirPath()
@@ -128,7 +30,11 @@ func initPgitForTest(t *testing.T) string {
 func removeTmpPgitDir(t *testing.T) {
 	t.Helper()
 
-	if err := os.RemoveAll(cmd.PgitDir); err != nil {
+	objdir, err := cmd.AbsObjDirPath()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(filepath.Dir(objdir)); err != nil {
 		t.Log(err)
 	}
 }
@@ -138,57 +44,207 @@ func newObjID(data []byte) string {
 	return hex.EncodeToString(s[:])
 }
 
-func TestInitCMD(t *testing.T) {
-	tests := []testCase{
-		{
-			desc:    "success_01",
-			args:    []string{},
-			genFile: true,
-			files: []*outputFile{
-				newoutputFile("dir", cmd.PgitDir),
-				newoutputFile("dir", filepath.Join(cmd.PgitDir, cmd.ObjDir)),
-			},
-			hasErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.desc, func(t *testing.T) {
-			testCmd(t, tt, cmd.InitCmd)
-		})
-	}
+type testCase struct {
+	desc string
+	args []string
+	out  wantOutput
 }
 
-func TestHashObjectCmd(t *testing.T) {
-	objdir := initPgitForTest(t)
-	t.Cleanup(func() { removeTmpPgitDir(t) })
-
-	arg := filepath.Join("./test")
-	content := `This is a message for test.`
-	oid := newObjID([]byte(content))
-
-	f, err := os.Create(arg)
+// the main test for examining the common behavior of each command
+func execCmd(t *testing.T, cmd *cobra.Command, args []string) (stdout string, err error) {
+	old := os.Stdout
+	r, w, err := os.Pipe()
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("file name: %s", f.Name())
-	f.WriteString(content)
-	f.Close()
-	t.Cleanup(func() {
-		if err := os.RemoveAll(f.Name()); err != nil {
-			t.Log(err)
+	defer r.Close()
+	os.Stdout = w
+
+	cmd.SetArgs(args)
+	err = cmd.RunE(cmd, args)
+
+	w.Close()
+
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	os.Stdout = old
+
+	return buf.String(), err
+}
+
+type output struct {
+	fileType string //"file" or "dir"
+	path     string
+}
+
+type wantOutput struct {
+	stdout string
+	outs   []output
+}
+
+func newWantOutput(stdout string, outs []output) wantOutput {
+	return wantOutput{
+		stdout: stdout,
+		outs:   outs,
+	}
+}
+
+func assertOutput(t *testing.T, stdout string, output wantOutput) {
+	if output.stdout != "" {
+		if stdout != output.stdout {
+			t.Errorf("Stdout should be equal: (got=%s, want=%s)", stdout, output.stdout)
+		}
+	}
+	if len(output.outs) != 0 {
+		for _, o := range output.outs {
+			fi, err := os.Stat(o.path)
+			if err != nil {
+				t.Errorf("file should be generated: (error: %s, path: %s)", err, o.path)
+				return
+			}
+			switch o.fileType {
+			case "dir":
+				if !fi.IsDir() {
+					t.Errorf("file should be dir: (got: %s)", fi.Name())
+				}
+			case "file":
+				if fi.IsDir() {
+					t.Errorf("file should not be dir: (got: %s)", fi.Name())
+				}
+			}
+		}
+	}
+}
+
+func TestInitCMD(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		objdir, err := cmd.AbsObjDirPath()
+		if err != nil {
+			t.Fatal(err)
+		}
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{},
+				out: newWantOutput("", []output{
+					{"dir", filepath.Dir(objdir)},
+					{"dir", objdir},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				t.Cleanup(func() {
+					removeTmpPgitDir(t)
+				})
+
+				stdout, err := execCmd(t, cmd.InitCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be nil: {error: %s}", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
 		}
 	})
+}
 
-	err = cmd.HashObjectCmd.RunE(cmd.HashObjectCmd, []string{arg})
+func TestHashObjectCmd(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		objdir, err := cmd.AbsObjDirPath()
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := `This is a message for test.`
+		oid := newObjID([]byte(content))
 
-	if err != nil {
-		t.Errorf("should be nil: (error: %s)", err)
-	}
-	fi, err := os.Stat(filepath.Join(objdir, oid))
-	if err != nil {
-		t.Errorf("file should be generated")
-	}
-	if fi.IsDir() {
-		t.Errorf("file should not be a directory")
-	}
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{"test"},
+				out: newWantOutput("", []output{
+					{"file", filepath.Join(objdir, oid)},
+				}),
+			},
+			{
+				desc: "02_with type flag",
+				args: []string{"test", "--type", "blob"},
+				out: newWantOutput("", []output{
+					{"file", filepath.Join(objdir, oid)},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				t.Cleanup(func() { removeTmpPgitDir(t) })
+
+				pgitdirpath := filepath.Base(initPgitForTest(t))
+				rootdir := filepath.Dir(pgitdirpath)
+
+				f, err := os.Create(filepath.Join(rootdir, "test"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.WriteString(content)
+				f.Close()
+
+				t.Cleanup(func() {
+					if err := os.RemoveAll(f.Name()); err != nil {
+						t.Log(err)
+					}
+				})
+
+				stdout, err := execCmd(t, cmd.HashObjectCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be empty: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestCatFile(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		content := `This is a message for test.`
+		oid := newObjID([]byte(content))
+
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{oid},
+				out: newWantOutput(
+					"This is a message for test.\n",
+					[]output{},
+				),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				objdir := initPgitForTest(t)
+
+				f, err := os.Create(filepath.Join(objdir, oid))
+				if err != nil {
+					t.Fatal(err)
+				}
+				f.WriteString(content)
+				f.Close()
+
+				t.Cleanup(func() {
+					removeTmpPgitDir(t)
+					if err := os.RemoveAll(f.Name()); err != nil {
+						t.Log(err)
+					}
+				})
+
+				stdout, err := execCmd(t, cmd.CatFileCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be empty: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
 }

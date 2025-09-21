@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -236,6 +237,41 @@ func TestCatFile(t *testing.T) {
 
 				if err != nil {
 					t.Errorf("error should be empty: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestWriteTree(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	ents, err := os.ReadDir(cwd)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fns := make([]string, len(ents))
+	for _, e := range ents {
+		fns = append(fns, e.Name())
+	}
+	wantStdout := strings.Join(fns, "")
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{},
+				out:  newWantOutput(wantStdout, []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				stdout, err := execCmd(t, cmd.WriteTreeCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
 				assertOutput(t, stdout, tt.out)
 			})

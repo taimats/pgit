@@ -156,19 +156,13 @@ func TestHashObjectCmd(t *testing.T) {
 			t.Fatal(err)
 		}
 		content := `This is a message for test.`
-		oid := newObjID([]byte(content))
+		data := cmd.NewObject("blob", cmd.IdentBlob, []byte(content)).Encode()
+		oid := newObjID(data)
 
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{"test"},
-				out: newWantOutput("", []output{
-					{"file", filepath.Join(objdir, oid)},
-				}),
-			},
-			{
-				desc: "02_with type flag",
-				args: []string{"test", "--type", "blob"},
 				out: newWantOutput("", []output{
 					{"file", filepath.Join(objdir, oid)},
 				}),

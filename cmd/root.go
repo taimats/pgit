@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -12,9 +13,9 @@ var rootCmd = &cobra.Command{
 }
 
 func Execute() {
-	rootCmd.SetOut(os.Stdout)
 	if err := rootCmd.Execute(); err != nil {
-		rootCmd.PrintErrln(err)
+		rootCmd.SetOut(os.Stderr)
+		fmt.Println(err)
 	}
 }
 

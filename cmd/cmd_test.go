@@ -253,11 +253,12 @@ func TestWriteTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fns := make([]string, len(ents))
-	for _, e := range ents {
-		fns = append(fns, e.Name())
+	var buf strings.Builder
+	for _, en := range ents {
+		buf.WriteString(en.Name())
+		buf.WriteString("\n")
 	}
-	wantStdout := strings.Join(fns, "")
+	wantStdout := buf.String()
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{

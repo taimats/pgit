@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -43,6 +43,18 @@ func removeTmpPgitDir(t *testing.T) {
 func newObjID(data []byte) string {
 	s := sha1.Sum(data)
 	return hex.EncodeToString(s[:])
+}
+
+func newBlobObj(t *testing.T, content []byte) (path string, oid string) {
+	t.Helper()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	obj := cmd.NewObject("blob", cmd.IdentBlob, content)
+	oid = newObjID(obj.Encode())
+	return filepath.Join(cwd, oid), oid
 }
 
 type testCase struct {
@@ -203,7 +215,8 @@ func TestHashObjectCmd(t *testing.T) {
 func TestCatFile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		content := `This is a message for test.`
-		oid := newObjID([]byte(content))
+		data := cmd.NewObject("blob", cmd.IdentBlob, []byte(content)).Encode()
+		oid := newObjID(data)
 
 		tests := []testCase{
 			{
@@ -223,7 +236,7 @@ func TestCatFile(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				f.WriteString(content)
+				f.Write(data)
 				f.Close()
 
 				t.Cleanup(func() {
@@ -253,22 +266,49 @@ func TestWriteTree(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var buf strings.Builder
+	var buf bytes.Buffer
+	paths := make([]string, len(ents))
 	for _, en := range ents {
-		buf.WriteString(en.Name())
-		buf.WriteString("\n")
+		f, err := os.Open(filepath.Join(cwd, en.Name()))
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer f.Close()
+		b, err := io.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		path, oid := newBlobObj(t, b)
+		paths = append(paths, path)
+		if en.IsDir() {
+			fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, en.Name())
+		} else {
+			fmt.Fprintf(&buf, "%s %s %s\n", cmd.ObjTypeBlob, oid, en.Name()) //e.g. "blob oid hoge.txt"
+		}
 	}
-	wantStdout := buf.String()
+	path, _ := newBlobObj(t, buf.Bytes())
+	output := newWantOutput("", []output{{"file", path}})
+
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
-				out:  newWantOutput(wantStdout, []output{}),
+				out:  output,
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
+				t.Cleanup(func() {
+					if err := os.Remove(path); err != nil {
+						t.Log(err)
+					}
+					for _, p := range paths {
+						if err := os.Remove(p); err != nil {
+							t.Log(err)
+						}
+					}
+				})
 				stdout, err := execCmd(t, cmd.WriteTreeCmd, tt.args)
 
 				if err != nil {

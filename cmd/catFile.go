@@ -33,7 +33,11 @@ var catFileCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(content))
+		obj, err := Decode(IdentBlob, content)
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(obj.data))
 		return nil
 	},
 }

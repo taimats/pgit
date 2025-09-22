@@ -18,6 +18,10 @@ var (
 	IdentBlob = []byte{'b', 0x00}
 )
 
+const (
+	ObjTypeBlob = "blob"
+)
+
 type Object struct {
 	objType string
 	ident   []byte //identifier
@@ -85,28 +89,34 @@ var hashObjCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		data := NewObject("blob", IdentBlob, content).Encode()
-		oid := hashObject(data)
+		oid, err := SaveHashObj(objdir, content)
 		if err != nil {
 			return err
 		}
-		newfile, err := os.Create(filepath.Join(objdir, oid))
-		if err != nil {
-			return err
-		}
-		defer newfile.Close()
-		newfile.Write(data)
-
 		log.Printf("saved a hashed-object!!\noid: %s\n", oid)
 		return nil
 	},
 }
 
 // oid is an so-called object ID.
-func hashObject(data []byte) (oid string) {
+func IssueObjID(data []byte) (oid string) {
 	s := sha1.Sum(data)
 	oid = hex.EncodeToString(s[:])
 	return oid
+}
+
+func SaveHashObj(basePath string, content []byte) (oid string, err error) {
+	obj := NewObject("blob", IdentBlob, content)
+	oid = IssueObjID(obj.Encode())
+	f, err := os.Create(filepath.Join(basePath, oid))
+	if err != nil {
+		return "", err
+	}
+	f.Write(content)
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return oid, nil
 }
 
 var objType string

@@ -48,13 +48,13 @@ func newObjID(data []byte) string {
 func newBlobObj(t *testing.T, content []byte) (path string, oid string) {
 	t.Helper()
 
-	cwd, err := os.Getwd()
+	objdir, err := cmd.AbsObjDirPath()
 	if err != nil {
 		t.Fatal(err)
 	}
 	obj := cmd.NewObject("blob", cmd.IdentBlob, content)
 	oid = newObjID(obj.Encode())
-	return filepath.Join(cwd, oid), oid
+	return filepath.Join(objdir, oid), oid
 }
 
 type testCase struct {
@@ -112,7 +112,7 @@ func assertOutput(t *testing.T, stdout string, output wantOutput) {
 		for _, o := range output.outs {
 			fi, err := os.Stat(o.path)
 			if err != nil {
-				t.Errorf("file should be generated: (error: %s, path: %s)", err, o.path)
+				t.Errorf("wantFile should be generated: (path: %s, error: %s)", o.path, err)
 				return
 			}
 			switch o.fileType {
@@ -287,19 +287,21 @@ func TestWriteTree(t *testing.T) {
 		}
 	}
 	path, _ := newBlobObj(t, buf.Bytes())
-	output := newWantOutput("", []output{{"file", path}})
+	wantOutput := newWantOutput("", []output{{"file", path}})
 
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
-				out:  output,
+				out:  wantOutput,
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
+				_ = initPgitForTest(t)
 				t.Cleanup(func() {
+					removeTmpPgitDir(t)
 					if err := os.Remove(path); err != nil {
 						t.Log(err)
 					}

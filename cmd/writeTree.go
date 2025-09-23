@@ -24,11 +24,11 @@ var writeTreeCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		cwd, err := os.Getwd()
-		if err != nil {
-			return err
+		rootPath := "."
+		if len(args) > 0 {
+			rootPath = args[0]
 		}
-		oid, err := saveTree(cwd)
+		oid, err := saveTree(rootPath)
 		if err != nil {
 			return fmt.Errorf("failed to write tree: %w", err)
 		}
@@ -38,18 +38,18 @@ var writeTreeCmd = &cobra.Command{
 }
 
 func saveTree(rootPath string) (oid string, err error) {
-	objdir, err := AbsObjDirPath()
-	if err != nil {
-		return "", err
-	}
-	oid, err = writeTree(objdir, rootPath)
+	oid, err = writeTree(rootPath)
 	if err != nil {
 		return "", err
 	}
 	return oid, nil
 }
 
-func writeTree(storePath, rootPath string) (oid string, err error) {
+// walk through the roothPath and do the following things for each file (or directory):
+// ・save each file as a hashed object in storage
+// ・if the given file is a directory, then recursively do the same
+// ・at the end, save the whole directory (i.e. rootPath) as a hashed object in storage
+func writeTree(rootPath string) (oid string, err error) {
 	var buf bytes.Buffer
 	err = filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -62,7 +62,7 @@ func writeTree(storePath, rootPath string) (oid string, err error) {
 			return nil
 		}
 		if d.IsDir() && !isExcluded(d.Name()) {
-			oid, err := writeTree(storePath, path)
+			oid, err := writeTree(path)
 			if err != nil {
 				return fmt.Errorf("failed to handle dir tree: %w\n{ path: %s }", err, path)
 			}
@@ -80,7 +80,7 @@ func writeTree(storePath, rootPath string) (oid string, err error) {
 		if err != nil {
 			return fmt.Errorf("failed to read a file: %w", err)
 		}
-		oid, err := SaveHashObj(storePath, b)
+		oid, err := SaveHashObj(b)
 		if err != nil {
 			return err
 		}
@@ -90,7 +90,7 @@ func writeTree(storePath, rootPath string) (oid string, err error) {
 	if err != nil {
 		return "", err
 	}
-	oid, err = SaveHashObj(storePath, buf.Bytes())
+	oid, err = SaveHashObj(buf.Bytes())
 	if err != nil {
 		return "", err
 	}

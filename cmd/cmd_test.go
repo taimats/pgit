@@ -15,29 +15,17 @@ import (
 )
 
 // creates all necessary directories and returns a fixed path(= "...rootDir/.pgit/objects")
-func initPgitForTest(t *testing.T) (objDirPath string) {
+func initPgitForTest(t *testing.T) {
 	t.Helper()
 
-	path, err := cmd.AbsObjDirPath()
-	if err != nil {
+	if err := os.MkdirAll(filepath.Join(cmd.PgitDir, cmd.ObjDir), os.ModeDir); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(path, 0750); err != nil {
-		t.Fatal(err)
-	}
-	return path
 }
 
-func removeTmpPgitDir(t *testing.T) {
+func removePgitDirForTest(t *testing.T) {
 	t.Helper()
-
-	objdir, err := cmd.AbsObjDirPath()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(filepath.Dir(objdir)); err != nil {
-		t.Log(err)
-	}
+	os.RemoveAll(filepath.Join(cmd.PgitDir))
 }
 
 func newObjID(data []byte) string {
@@ -47,14 +35,9 @@ func newObjID(data []byte) string {
 
 func newBlobObj(t *testing.T, content []byte) (path string, oid string) {
 	t.Helper()
-
-	objdir, err := cmd.AbsObjDirPath()
-	if err != nil {
-		t.Fatal(err)
-	}
 	obj := cmd.NewObject("blob", cmd.IdentBlob, content)
 	oid = newObjID(obj.Encode())
-	return filepath.Join(objdir, oid), oid
+	return filepath.Join(cmd.PgitDir, cmd.ObjDir, oid), oid
 }
 
 type testCase struct {
@@ -103,6 +86,12 @@ func newWantOutput(stdout string, outs []output) wantOutput {
 }
 
 func assertOutput(t *testing.T, stdout string, output wantOutput) {
+	t.Cleanup(func() {
+		for _, out := range output.outs {
+			os.Remove(out.path)
+		}
+	})
+
 	if output.stdout != "" {
 		if stdout != output.stdout {
 			t.Errorf("Stdout should be equal: (got=%s, want=%s)", stdout, output.stdout)
@@ -131,24 +120,20 @@ func assertOutput(t *testing.T, stdout string, output wantOutput) {
 
 func TestInitCMD(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		objdir, err := cmd.AbsObjDirPath()
-		if err != nil {
-			t.Fatal(err)
-		}
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
 				out: newWantOutput("", []output{
-					{"dir", filepath.Dir(objdir)},
-					{"dir", objdir},
+					{"dir", cmd.PgitDir},
+					{"dir", filepath.Join(cmd.PgitDir, cmd.ObjDir)},
 				}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
 				t.Cleanup(func() {
-					removeTmpPgitDir(t)
+					removePgitDirForTest(t)
 				})
 
 				stdout, err := execCmd(t, cmd.InitCmd, tt.args)
@@ -164,11 +149,15 @@ func TestInitCMD(t *testing.T) {
 
 func TestHashObjectCmd(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		objdir, err := cmd.AbsObjDirPath()
+		content := `This is a message for hash object test.`
+		f, err := os.Create("test")
 		if err != nil {
 			t.Fatal(err)
 		}
-		content := `This is a message for test.`
+		f.WriteString(content)
+		f.Close()
+		t.Cleanup(func() { os.Remove("test") })
+
 		data := cmd.NewObject("blob", cmd.IdentBlob, []byte(content)).Encode()
 		oid := newObjID(data)
 
@@ -177,28 +166,15 @@ func TestHashObjectCmd(t *testing.T) {
 				desc: "01_all well done",
 				args: []string{"test"},
 				out: newWantOutput("", []output{
-					{"file", filepath.Join(objdir, oid)},
+					{"file", filepath.Join(cmd.PgitDir, cmd.ObjDir, oid)},
 				}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				t.Cleanup(func() { removeTmpPgitDir(t) })
-
-				pgitdirpath := filepath.Base(initPgitForTest(t))
-				rootdir := filepath.Dir(pgitdirpath)
-
-				f, err := os.Create(filepath.Join(rootdir, "test"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				f.WriteString(content)
-				f.Close()
-
+				initPgitForTest(t)
 				t.Cleanup(func() {
-					if err := os.RemoveAll(f.Name()); err != nil {
-						t.Log(err)
-					}
+					removePgitDirForTest(t)
 				})
 
 				stdout, err := execCmd(t, cmd.HashObjectCmd, tt.args)
@@ -214,37 +190,27 @@ func TestHashObjectCmd(t *testing.T) {
 
 func TestCatFile(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
-		content := `This is a message for test.`
-		data := cmd.NewObject("blob", cmd.IdentBlob, []byte(content)).Encode()
-		oid := newObjID(data)
-
+		content := `This is a message for cat-file test.`
+		_, oid := newBlobObj(t, []byte(content))
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{oid},
-				out: newWantOutput(
-					"This is a message for test.\n",
-					[]output{},
-				),
+				out: newWantOutput("", []output{
+					{"file", filepath.Join(cmd.PgitDir, cmd.ObjDir, oid)},
+				}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				objdir := initPgitForTest(t)
-
-				f, err := os.Create(filepath.Join(objdir, oid))
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					removePgitDirForTest(t)
+				})
+				_, err := cmd.SaveHashObj([]byte(content))
 				if err != nil {
 					t.Fatal(err)
 				}
-				f.Write(data)
-				f.Close()
-
-				t.Cleanup(func() {
-					removeTmpPgitDir(t)
-					if err := os.RemoveAll(f.Name()); err != nil {
-						t.Log(err)
-					}
-				})
 
 				stdout, err := execCmd(t, cmd.CatFileCmd, tt.args)
 
@@ -258,18 +224,13 @@ func TestCatFile(t *testing.T) {
 }
 
 func TestWriteTree(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	ents, err := os.ReadDir(cwd)
+	ents, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)
 	}
 	var buf bytes.Buffer
-	paths := make([]string, len(ents))
 	for _, en := range ents {
-		f, err := os.Open(filepath.Join(cwd, en.Name()))
+		f, err := os.Open(en.Name())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -278,8 +239,7 @@ func TestWriteTree(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		path, oid := newBlobObj(t, b)
-		paths = append(paths, path)
+		_, oid := newBlobObj(t, b)
 		if en.IsDir() {
 			fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, en.Name())
 		} else {
@@ -299,19 +259,48 @@ func TestWriteTree(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				_ = initPgitForTest(t)
+				initPgitForTest(t)
 				t.Cleanup(func() {
-					removeTmpPgitDir(t)
-					if err := os.Remove(path); err != nil {
-						t.Log(err)
-					}
-					for _, p := range paths {
-						if err := os.Remove(p); err != nil {
-							t.Log(err)
-						}
-					}
+					removePgitDirForTest(t)
 				})
+
 				stdout, err := execCmd(t, cmd.WriteTreeCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestReadTree(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{},
+				out:  wantOutput{},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				initPgitForTest(t)
+				t.Cleanup(func() { removePgitDirForTest(t) })
+
+				oid, err := cmd.WriteTree(".")
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { os.RemoveAll(oid) })
+
+				tt.args = []string{oid}
+				tt.out = newWantOutput("", []output{
+					{fileType: "dir", path: oid},
+				})
+
+				stdout, err := execCmd(t, cmd.ReadTreeCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)

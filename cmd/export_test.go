@@ -5,4 +5,6 @@ var (
 	HashObjectCmd = hashObjCmd
 	CatFileCmd    = catFileCmd
 	WriteTreeCmd  = writeTreeCmd
+	ReadTreeCmd   = readTreeCmd
+	WriteTree     = writeTree
 )

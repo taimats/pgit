@@ -19,27 +19,28 @@ var catFileCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		objdir, err := AbsObjDirPath()
+		oid := args[0]
+		content, err := FetchFileContent(oid)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to fetch file content: (error: %w)", err)
 		}
-		filename := args[0]
-		f, err := os.Open(filepath.Join(objdir, filename))
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		content, err := io.ReadAll(f)
-		if err != nil {
-			return err
-		}
-		obj, err := Decode(IdentBlob, content)
-		if err != nil {
-			return err
-		}
-		fmt.Println(string(obj.data))
+		fmt.Println(string(content))
 		return nil
 	},
+}
+
+// search object storage for the content of a file by an object ID
+func FetchFileContent(oid string) ([]byte, error) {
+	f, err := os.Open(filepath.Join(PgitDir, ObjDir, oid))
+	if err != nil {
+		return nil, fmt.Errorf("no such an object ID in storage")
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	return b, nil
 }
 
 func init() {

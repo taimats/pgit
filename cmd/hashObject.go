@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
-	"errors"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -38,7 +38,7 @@ func NewObject(objType string, ident []byte, data []byte) *Object {
 
 func (o *Object) Encode() []byte {
 	var buf bytes.Buffer
-	buf.Write([]byte(o.objType))
+	buf.WriteString(o.objType)
 	buf.Write(o.ident)
 	buf.Write(o.data)
 	return buf.Bytes()
@@ -54,15 +54,6 @@ func (o *Object) Data() []byte {
 	return o.data
 }
 
-func Decode(ident []byte, b []byte) (*Object, error) {
-	sep := bytes.Split(b, ident)
-	if len(sep) != 2 {
-		return nil, errors.New("invalid input: a given object in byte is not valid for Object structure")
-	}
-	obj := NewObject(string(sep[0]), ident, sep[1])
-	return obj, nil
-}
-
 var hashObjCmd = &cobra.Command{
 	Use:   "hash-object",
 	Short: "save a hashed-object",
@@ -72,16 +63,8 @@ var hashObjCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		objdir, err := AbsObjDirPath()
-		if err != nil {
-			return err
-		}
-		filename := args[0]
-		path, err := filepath.Abs(filename)
-		if err != nil {
-			return err
-		}
-		f, err := os.Open(path)
+		filename := filepath.Clean(args[0])
+		f, err := os.Open(filename)
 		if err != nil {
 			return err
 		}
@@ -90,7 +73,7 @@ var hashObjCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		oid, err := SaveHashObj(objdir, content)
+		oid, err := SaveHashObj(content)
 		if err != nil {
 			return err
 		}
@@ -106,17 +89,17 @@ func IssueObjID(data []byte) (oid string) {
 	return oid
 }
 
-func SaveHashObj(basePath string, content []byte) (oid string, err error) {
+// covert bytes to object and save it under object storage(="current dir/.pgit/objects/")
+func SaveHashObj(content []byte) (oid string, err error) {
 	obj := NewObject("blob", IdentBlob, content)
 	oid = IssueObjID(obj.Encode())
-	f, err := os.Create(filepath.Join(basePath, oid))
+	f, err := os.Create(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to create a file: (error: %w)", err)
 	}
 	f.Write(content)
-	if err := f.Close(); err != nil {
-		return "", err
-	}
+	f.Close()
+
 	return oid, nil
 }
 

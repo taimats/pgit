@@ -119,10 +119,6 @@ func SaveHashObj(basePath string, content []byte) (oid string, err error) {
 	return oid, nil
 }
 
-var objType string
-
 func init() {
 	rootCmd.AddCommand(hashObjCmd)
-
-	hashObjCmd.Flags().StringP("type", "t", objType, "specify a object type")
 }

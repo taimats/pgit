@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -16,12 +15,13 @@ var catFileCmd = &cobra.Command{
 	Short: "print the content of a named file",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		objdir, err := AbsObjDirPath()
+		err := CheckPgitInit()
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stat(objdir); err != nil {
-			return errors.New("need initializing first")
+		objdir, err := AbsObjDirPath()
+		if err != nil {
+			return err
 		}
 		filename := args[0]
 		f, err := os.Open(filepath.Join(objdir, filename))

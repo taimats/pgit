@@ -68,12 +68,13 @@ var hashObjCmd = &cobra.Command{
 	Short: "save a hashed-object",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		objdir, err := AbsObjDirPath()
+		err := CheckPgitInit()
 		if err != nil {
 			return err
 		}
-		if _, err := os.Stat(objdir); err != nil {
-			return errors.New("need initializing first")
+		objdir, err := AbsObjDirPath()
+		if err != nil {
+			return err
 		}
 		filename := args[0]
 		path, err := filepath.Abs(filename)

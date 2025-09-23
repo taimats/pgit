@@ -1,9 +1,15 @@
 package cmd
 
-import "path/filepath"
+import (
+	"errors"
+	"os"
+	"path/filepath"
+)
 
 const PgitDir = ".pgit"
 const ObjDir = "objects"
+
+var ErrNeedPgitInit = errors.New("need initializing pgit first")
 
 func AbsObjDirPath() (string, error) {
 	name := filepath.Join(PgitDir, ObjDir)
@@ -12,4 +18,15 @@ func AbsObjDirPath() (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func CheckPgitInit() error {
+	objdir, err := AbsObjDirPath()
+	if err != nil {
+		return err
+	}
+	if _, err := os.Stat(objdir); err != nil {
+		return ErrNeedPgitInit
+	}
+	return nil
 }

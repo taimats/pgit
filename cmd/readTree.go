@@ -7,8 +7,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -19,13 +21,13 @@ var readTreeCmd = &cobra.Command{
 	Short: "lay out the content of a tree object into the working directory",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := sweepDir("."); err != nil {
+			return err
+		}
 		oid := args[0]
 		treeContent, err := FetchFileContent(oid)
 		if err != nil {
 			return fmt.Errorf("failed to find a tree content: (error: %s)", err)
-		}
-		if err := os.Mkdir(oid, os.ModeDir); err != nil {
-			return err
 		}
 		sc := bufio.NewScanner(bytes.NewReader(treeContent))
 		sc.Split(bufio.ScanLines)
@@ -35,11 +37,12 @@ var readTreeCmd = &cobra.Command{
 			if len(sep) != 3 {
 				return fmt.Errorf("invalid data: { object: %s}", sep)
 			}
-			fc, err := FetchFileContent(string(sep[1]))
+			_, oid, filename := sep[0], sep[1], sep[2]
+			fc, err := FetchFileContent(string(oid))
 			if err != nil {
 				return err
 			}
-			f, err := os.Create(filepath.Join(oid, string(sep[1])))
+			f, err := os.Create(filepath.Clean(string(filename)))
 			if err != nil {
 				return err
 			}
@@ -49,6 +52,32 @@ var readTreeCmd = &cobra.Command{
 		fmt.Println("read a tree object!!")
 		return nil
 	},
+}
+
+func sweepDir(rootPath string) error {
+	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == rootPath {
+			return nil
+		}
+		if isIgnored(d.Name()) {
+			return filepath.SkipDir
+		}
+		if err := os.RemoveAll(path); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func isIgnored(baseName string) bool {
+	return baseName == PgitDir || strings.HasPrefix(baseName, ".")
 }
 
 func init() {

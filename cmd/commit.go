@@ -6,6 +6,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -34,8 +35,15 @@ func NewCommit(msg string) (oid string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to write tree: (error: %w)", err)
 	}
+	head, err := getHead()
+	if err != nil {
+		return "", err
+	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %s\n", ObjTypeTree, treeOid)
+	if head != "" {
+		fmt.Fprintf(&buf, "%s %s\n", "parent", head)
+	}
 	buf.WriteString("\n")
 	buf.WriteString(msg)
 
@@ -43,25 +51,39 @@ func NewCommit(msg string) (oid string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to save hash object: (error: %w)", err)
 	}
-	if err := addHeadFile(oid); err != nil {
+	if err := updateHead(oid); err != nil {
 		return "", err
 	}
 	return oid, nil
 }
 
-func addHeadFile(oid string) error {
-	f, err := os.OpenFile(
-		filepath.Join(PgitDir, "HEAD"),
-		os.O_WRONLY|os.O_CREATE|os.O_APPEND,
-		0660,
-	)
+// HEAD represetns the latest commit, so the HEAD file always has one oid.
+func updateHead(oid string) error {
+	f, err := os.Create(filepath.Join(PgitDir, "HEAD"))
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	fmt.Fprintf(f, "%s\n", oid)
+	f.WriteString(oid)
 	return nil
+}
+
+func getHead() (string, error) {
+	f, err := os.Open(filepath.Join(PgitDir, "HEAD"))
+	if err != nil {
+		if _, ok := err.(*os.PathError); ok {
+			return "", nil
+		} else {
+			return "", err
+		}
+	}
+	defer f.Close()
+	b, err := io.ReadAll(f)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 var message string

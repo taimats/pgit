@@ -28,21 +28,18 @@ func TestMain(m *testing.M) {
 	if err := os.Mkdir(newDir, os.ModeDir); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("{ Dir: %s}を作成\n", newDir)
 	if err := os.Chdir(newDir); err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("{ Dir: %s}に移動\n", newDir)
+
 	code := m.Run()
 
 	if err := os.Chdir(cwd); err != nil {
 		log.Println(err)
 	}
-	log.Printf("{ Dir: %s}に戻る\n", cwd)
 	if err := os.RemoveAll(newDir); err != nil {
 		log.Println(err)
 	}
-	log.Printf("{ Dir: %s}を削除\n", newDir)
 
 	os.Exit(code)
 }
@@ -257,13 +254,18 @@ func TestCatFile(t *testing.T) {
 }
 
 func TestWriteTree(t *testing.T) {
-	ents, err := os.ReadDir(".")
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	fps, err := filepath.Glob(filepath.Join(cmdDir, "*.go"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	var buf bytes.Buffer
-	for _, en := range ents {
-		f, err := os.Open(en.Name())
+	for _, fp := range fps {
+		f, err := os.Open(fp)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -273,14 +275,18 @@ func TestWriteTree(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, oid := newBlobObj(t, b)
-		if en.IsDir() {
-			fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, en.Name())
-		} else {
-			fmt.Fprintf(&buf, "%s %s %s\n", cmd.ObjTypeBlob, oid, en.Name()) //e.g. "blob oid hoge.txt"
+		baseName := filepath.Base(fp)
+		fmt.Fprintf(&buf, "%s %s %s\n", cmd.ObjTypeBlob, oid, baseName) //e.g. "blob oid hoge.txt"
+
+		testFile, err := os.Create(filepath.Join(cwd, baseName))
+		if err != nil {
+			t.Fatal(err)
 		}
+		testFile.Write(b)
+		defer testFile.Close()
 	}
-	path, _ := newBlobObj(t, buf.Bytes())
-	wantOutput := newWantOutput("", []output{{"file", path}})
+	treePath, _ := newBlobObj(t, buf.Bytes())
+	wantOutput := newWantOutput("", []output{{"file", treePath}})
 
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
@@ -309,12 +315,47 @@ func TestWriteTree(t *testing.T) {
 }
 
 func TestReadTree(t *testing.T) {
+	//setting up temporary files in the test directory
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	fps, err := filepath.Glob(filepath.Join(cmdDir, "*.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	outs := make([]output, 0, len(fps))
+	for _, fp := range fps {
+		f, err := os.Open(fp)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := io.ReadAll(f)
+		if err != nil {
+			t.Fatal(err)
+		}
+		f.Close()
+		baseName := filepath.Base(fp)
+		testFile, err := os.Create(filepath.Join(cwd, baseName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		testFile.Write(b)
+		testFile.Close()
+
+		outs = append(outs, output{
+			fileType: "file",
+			path:     filepath.Join(cwd, baseName),
+		})
+	}
+
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
-				out:  wantOutput{},
+				out:  newWantOutput("", outs),
 			},
 		}
 		for _, tt := range tests {
@@ -326,12 +367,7 @@ func TestReadTree(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				t.Cleanup(func() { os.RemoveAll(oid) })
-
 				tt.args = []string{oid}
-				tt.out = newWantOutput("", []output{
-					{fileType: "dir", path: oid},
-				})
 
 				stdout, err := execCmd(t, cmd.ReadTreeCmd, tt.args)
 

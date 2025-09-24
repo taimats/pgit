@@ -89,7 +89,7 @@ func IssueObjID(data []byte) (oid string) {
 	return oid
 }
 
-// covert bytes to object and save it under object storage(="current dir/.pgit/objects/")
+// covert bytes to object and save it under object storage(="rootDir/.pgit/objects/")
 func SaveHashObj(content []byte) (oid string, err error) {
 	obj := NewObject("blob", IdentBlob, content)
 	oid = IssueObjID(obj.Encode())

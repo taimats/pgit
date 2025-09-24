@@ -8,4 +8,5 @@ var (
 	ReadTreeCmd   = readTreeCmd
 	WriteTree     = writeTree
 	CommitCmd     = commitCmd
+	LogCmd        = logCmd
 )

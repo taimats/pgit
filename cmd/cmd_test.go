@@ -496,3 +496,33 @@ func loadAndSetFiles(srcDir string, pattern string, targetDir string) (paths []s
 	}
 	return paths, nil
 }
+
+func TestLog(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "log")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+
+				stdout, err := execCmd(t, cmd.LogCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				if stdout == "" {
+					t.Errorf("stdout should not be empty")
+				}
+			})
+		}
+	})
+}

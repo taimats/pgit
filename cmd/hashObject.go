@@ -20,6 +20,7 @@ var (
 
 const (
 	ObjTypeBlob = "blob"
+	ObjTypeTree = "tree"
 )
 
 type Object struct {

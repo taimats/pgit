@@ -44,7 +44,35 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// creates all necessary directories and returns a fixed path(= "...rootDir/.pgit/objects")
+func joinTestDir(t *testing.T, name string) (rootPath string) {
+	t.Helper()
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	rootPath = filepath.Join(cwd, name)
+	if err := os.Mkdir(rootPath, os.ModeDir); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chdir(rootPath); err != nil {
+		t.Fatal(err)
+	}
+	return rootPath
+}
+
+func leaveTestDir(t *testing.T, rootPath string) {
+	t.Helper()
+
+	if err := os.Chdir(filepath.Dir(rootPath)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.RemoveAll(rootPath); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// creates all necessary directories
 func initPgitForTest(t *testing.T) {
 	t.Helper()
 
@@ -86,7 +114,9 @@ func execCmd(t *testing.T, cmd *cobra.Command, args []string) (stdout string, er
 	defer r.Close()
 	os.Stdout = w
 
-	cmd.SetArgs(args)
+	if err := cmd.ParseFlags(args); err != nil {
+		t.Fatal(err)
+	}
 	err = cmd.RunE(cmd, args)
 
 	w.Close()
@@ -378,4 +408,91 @@ func TestReadTree(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestCommit(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{"-m", "test message"},
+				out: newWantOutput("", []output{
+					{fileType: "file", path: filepath.Join(cmd.PgitDir, "HEAD")},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "commit")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = cmd.WriteTree(rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				ents, err := os.ReadDir(filepath.Join(rootPath, cmd.PgitDir, cmd.ObjDir))
+				if err != nil {
+					t.Fatal(err)
+				}
+				currentFileNum := len(ents)
+
+				stdout, err := execCmd(t, cmd.CommitCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				afterEnts, err := os.ReadDir(filepath.Join(rootPath, cmd.PgitDir, cmd.ObjDir))
+				if err != nil {
+					t.Fatal(err)
+				}
+				gotFileNum := len(afterEnts)
+				if gotFileNum != (currentFileNum + 1) {
+					t.Errorf("file num should be equal: (gotNum: %d, wantNum: %d)", gotFileNum, currentFileNum+1)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+// This is a helper function for test. The feature is to load files from srdDir corresponding to pattern and save them in targetDir.
+// The returned paths are filepaths saved in the targetDir.
+func loadAndSetFiles(srcDir string, pattern string, targetDir string) (paths []string, err error) {
+	fps, err := filepath.Glob(filepath.Join(srcDir, pattern))
+	if err != nil {
+		return nil, err
+	}
+	paths = make([]string, 0, len(fps))
+	for _, fp := range fps {
+		f, err := os.Open(fp)
+		if err != nil {
+			return nil, err
+		}
+		b, err := io.ReadAll(f)
+		if err != nil {
+			return nil, err
+		}
+		f.Close()
+		path := filepath.Join(targetDir, filepath.Base(fp))
+		testFile, err := os.Create(path)
+		if err != nil {
+			return nil, err
+		}
+		testFile.Write(b)
+		testFile.Close()
+
+		paths = append(paths, path)
+	}
+	return paths, nil
 }

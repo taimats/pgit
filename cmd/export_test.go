@@ -7,4 +7,5 @@ var (
 	WriteTreeCmd  = writeTreeCmd
 	ReadTreeCmd   = readTreeCmd
 	WriteTree     = writeTree
+	CommitCmd     = commitCmd
 )

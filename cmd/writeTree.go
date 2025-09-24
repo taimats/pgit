@@ -28,7 +28,7 @@ var writeTreeCmd = &cobra.Command{
 		if len(args) > 0 {
 			rootPath = args[0]
 		}
-		oid, err := saveTree(rootPath)
+		oid, err := saveTree(filepath.Clean(rootPath))
 		if err != nil {
 			return fmt.Errorf("failed to write tree: %w", err)
 		}
@@ -37,6 +37,7 @@ var writeTreeCmd = &cobra.Command{
 	},
 }
 
+// saveTree is just a high-level layer of function to execute write-tree command.
 func saveTree(rootPath string) (oid string, err error) {
 	oid, err = writeTree(rootPath)
 	if err != nil {
@@ -45,11 +46,12 @@ func saveTree(rootPath string) (oid string, err error) {
 	return oid, nil
 }
 
-// walk through the roothPath and do the following things for each file (or directory):
+// Tree represents a directory in this package's context.
+// writeTree walks through the roothPath and do the following things for each file (or directory):
 // ・save each file as a hashed object in storage
 // ・if the given file is a directory, then recursively do the same
 // ・at the end, save the whole directory (i.e. rootPath) as a hashed object in storage
-func writeTree(rootPath string) (oid string, err error) {
+func writeTree(rootPath string) (treeOid string, err error) {
 	var buf bytes.Buffer
 	err = filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
@@ -59,12 +61,12 @@ func writeTree(rootPath string) (oid string, err error) {
 			return nil
 		}
 		if isExcluded(d.Name()) {
-			return nil
+			return filepath.SkipDir
 		}
-		if d.IsDir() && !isExcluded(d.Name()) {
+		if d.IsDir() {
 			oid, err := writeTree(path)
 			if err != nil {
-				return fmt.Errorf("failed to handle dir tree: %w\n{ path: %s }", err, path)
+				return fmt.Errorf("failed to handle dir: %w\n{ path: %s }", err, path)
 			}
 			if _, err := fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, d.Name()); err != nil {
 				return err
@@ -90,15 +92,15 @@ func writeTree(rootPath string) (oid string, err error) {
 	if err != nil {
 		return "", err
 	}
-	oid, err = SaveHashObj(buf.Bytes())
+	treeOid, err = SaveHashObj(buf.Bytes())
 	if err != nil {
 		return "", err
 	}
-	return oid, nil
+	return treeOid, nil
 }
 
 func isExcluded(baseName string) bool {
-	return baseName == PgitDir || baseName == ObjDir || strings.HasPrefix(baseName, ".")
+	return baseName == PgitDir || strings.HasPrefix(baseName, ".")
 }
 
 func init() {

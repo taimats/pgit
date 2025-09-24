@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"testing"
@@ -13,6 +14,38 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/taimats/pgit/cmd"
 )
+
+// Each test of cmd package is highly likely to disturb the current working directory.
+// This will negatively affect each test case and produce no valid outcome.
+// In light of this, TestMain prepares a temporary directory for test and execute each test there.
+// After all tests are done, TestMain is expected to clean up the prep.
+func TestMain(m *testing.M) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+	newDir := filepath.Join(cwd, "test")
+	if err := os.Mkdir(newDir, os.ModeDir); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("{ Dir: %s}を作成\n", newDir)
+	if err := os.Chdir(newDir); err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("{ Dir: %s}に移動\n", newDir)
+	code := m.Run()
+
+	if err := os.Chdir(cwd); err != nil {
+		log.Println(err)
+	}
+	log.Printf("{ Dir: %s}に戻る\n", cwd)
+	if err := os.RemoveAll(newDir); err != nil {
+		log.Println(err)
+	}
+	log.Printf("{ Dir: %s}を削除\n", newDir)
+
+	os.Exit(code)
+}
 
 // creates all necessary directories and returns a fixed path(= "...rootDir/.pgit/objects")
 func initPgitForTest(t *testing.T) {

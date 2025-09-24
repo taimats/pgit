@@ -24,7 +24,7 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	newDir := filepath.Join(cwd, "test")
+	newDir := filepath.Join(cwd, "testDir")
 	if err := os.Mkdir(newDir, os.ModeDir); err != nil {
 		log.Fatal(err)
 	}

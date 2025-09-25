@@ -11,4 +11,5 @@ var (
 	LogCmd        = logCmd
 	CheckoutCmd   = checkoutCmd
 	SweepDir      = sweepDir
+	TagCmd        = tagCmd
 )

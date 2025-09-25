@@ -76,7 +76,7 @@ func leaveTestDir(t *testing.T, rootPath string) {
 func initPgitForTest(t *testing.T) {
 	t.Helper()
 
-	if err := os.MkdirAll(filepath.Join(cmd.PgitDir, cmd.ObjDir), os.ModeDir); err != nil {
+	if err := cmd.InitCmd.RunE(cmd.InitCmd, []string{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -187,6 +187,9 @@ func TestInitCMD(t *testing.T) {
 				out: newWantOutput("", []output{
 					{"dir", cmd.PgitDir},
 					{"dir", filepath.Join(cmd.PgitDir, cmd.ObjDir)},
+					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir)},
+					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir)},
+					{"file", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "HEAD")},
 				}),
 			},
 		}
@@ -421,9 +424,7 @@ func TestCommit(t *testing.T) {
 			{
 				desc: "01_all well done",
 				args: []string{"-m", "test message"},
-				out: newWantOutput("", []output{
-					{fileType: "file", path: filepath.Join(cmd.PgitDir, "HEAD")},
-				}),
+				out:  newWantOutput("", []output{}),
 			},
 		}
 		for _, tt := range tests {
@@ -543,7 +544,7 @@ func TestCheckout(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				rootPath := joinTestDir(t, "log")
+				rootPath := joinTestDir(t, "checkout")
 				initPgitForTest(t)
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
@@ -553,17 +554,13 @@ func TestCheckout(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				outs := make([]output, 0, len(paths)+1)
+				outs := make([]output, 0, len(paths))
 				for _, path := range paths {
 					outs = append(outs, output{
 						fileType: "file",
 						path:     path,
 					})
 				}
-				outs = append(outs, output{
-					fileType: "file",
-					path:     filepath.Join(cmd.PgitDir, "HEAD"),
-				})
 				tt.out = newWantOutput("", outs)
 
 				_, err = cmd.WriteTree(".")
@@ -580,6 +577,36 @@ func TestCheckout(t *testing.T) {
 				}
 
 				stdout, err := execCmd(t, cmd.CheckoutCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestTag(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_HEAD",
+				args: []string{"test"},
+				out: newWantOutput("", []output{
+					{fileType: "file", path: filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "test")},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "tag")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+
+				stdout, err := execCmd(t, cmd.TagCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)

@@ -37,9 +37,9 @@ var logCmd = &cobra.Command{
 func CommitList(startOid string) error {
 	var err error
 	if startOid == "" {
-		startOid, err = getHead()
+		startOid, err = getOidFromRef(RefHEAD)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get an oid for HEAD: %w", err)
 		}
 	}
 	parent, err := commitParent(startOid)

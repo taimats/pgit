@@ -21,7 +21,7 @@ var checkoutCmd = &cobra.Command{
 		if err := readTreeCmd.RunE(readTreeCmd, []string{treeOid}); err != nil {
 			return err
 		}
-		if err := updateHead(commitOid); err != nil {
+		if err := updateRef(RefHEAD, commitOid); err != nil {
 			return err
 		}
 		return nil

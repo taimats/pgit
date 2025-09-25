@@ -37,7 +37,7 @@ func NewCommit(msg string) (commitOid string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to write tree: (error: %w)", err)
 	}
-	head, err := getHead()
+	head, err := getOidFromRef(RefHEAD)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +53,7 @@ func NewCommit(msg string) (commitOid string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to save hash object: (error: %w)", err)
 	}
-	if err := updateHead(oid); err != nil {
+	if err := updateRef(RefHEAD, oid); err != nil {
 		return "", err
 	}
 	return oid, nil
@@ -75,9 +75,17 @@ func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 	return "", ErrNotFound
 }
 
-// HEAD represetns the latest commit, so the HEAD file always has one oid.
-func updateHead(oid string) error {
-	f, err := os.Create(filepath.Join(PgitDir, "HEAD"))
+// Ref is a shorthand for reference, and is virtually equivalent to a tag.
+// In a nutshell, both are responsible for attaching a name to a specific oid (object ID).
+func updateRef(ref string, oid string) error {
+	if oid == "" {
+		headOid, err := getOidFromRef(RefHEAD)
+		if err != nil {
+			return err
+		}
+		oid = headOid
+	}
+	f, err := os.Create(filepath.Join(PgitDir, RefDir, TagDir, ref))
 	if err != nil {
 		return err
 	}
@@ -87,11 +95,14 @@ func updateHead(oid string) error {
 	return nil
 }
 
-func getHead() (string, error) {
-	f, err := os.Open(filepath.Join(PgitDir, "HEAD"))
+func getOidFromRef(ref string) (oid string, err error) {
+	if ref == "" {
+		ref = RefHEAD
+	}
+	f, err := os.Open(filepath.Join(PgitDir, RefDir, TagDir, ref))
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			return "", nil
+			return "", ErrNotFound
 		} else {
 			return "", err
 		}

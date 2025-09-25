@@ -526,3 +526,66 @@ func TestLog(t *testing.T) {
 		}
 	})
 }
+
+func TestCheckout(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all well done",
+				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "log")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+
+				paths, err := loadAndSetFiles(cmdDir, "*.go", ".")
+				if err != nil {
+					t.Fatal(err)
+				}
+				outs := make([]output, 0, len(paths)+1)
+				for _, path := range paths {
+					outs = append(outs, output{
+						fileType: "file",
+						path:     path,
+					})
+				}
+				outs = append(outs, output{
+					fileType: "file",
+					path:     filepath.Join(cmd.PgitDir, "HEAD"),
+				})
+				tt.out = newWantOutput("", outs)
+
+				_, err = cmd.WriteTree(".")
+				if err != nil {
+					t.Fatal(err)
+				}
+				oid, err := cmd.NewCommit("test message")
+				if err != nil {
+					t.Fatal(err)
+				}
+				tt.args = []string{oid}
+				if err := cmd.SweepDir("."); err != nil {
+					t.Fatal(err)
+				}
+
+				stdout, err := execCmd(t, cmd.CheckoutCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}

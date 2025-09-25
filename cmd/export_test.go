@@ -9,4 +9,6 @@ var (
 	WriteTree     = writeTree
 	CommitCmd     = commitCmd
 	LogCmd        = logCmd
+	CheckoutCmd   = checkoutCmd
+	SweepDir      = sweepDir
 )

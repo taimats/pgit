@@ -1,15 +1,20 @@
 package cmd
 
+//Commands
 var (
 	InitCmd       = initCmd
 	HashObjectCmd = hashObjCmd
 	CatFileCmd    = catFileCmd
 	WriteTreeCmd  = writeTreeCmd
 	ReadTreeCmd   = readTreeCmd
-	WriteTree     = writeTree
 	CommitCmd     = commitCmd
 	LogCmd        = logCmd
 	CheckoutCmd   = checkoutCmd
-	SweepDir      = sweepDir
 	TagCmd        = tagCmd
+)
+
+//The rest other than commands
+var (
+	SweepDir  = sweepDir
+	WriteTree = writeTree
 )

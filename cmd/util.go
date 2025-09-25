@@ -5,8 +5,16 @@ import (
 	"os"
 )
 
-const PgitDir = ".pgit"
-const ObjDir = "objects"
+const (
+	PgitDir = ".pgit"
+	ObjDir  = "objects"
+	RefDir  = "refs"
+	TagDir  = "tags"
+)
+
+const (
+	RefHEAD = "HEAD"
+)
 
 var ErrNeedPgitInit = errors.New("need initializing pgit first")
 

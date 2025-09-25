@@ -24,6 +24,14 @@ var initCmd = &cobra.Command{
 		if err := os.MkdirAll(filepath.Join(RooDir, PgitDir, ObjDir), os.ModeDir); err != nil {
 			return err
 		}
+		if err := os.MkdirAll(filepath.Join(RooDir, PgitDir, RefDir, TagDir), os.ModeDir); err != nil {
+			return err
+		}
+		f, err := os.Create(filepath.Join(RooDir, PgitDir, RefDir, TagDir, RefHEAD))
+		if err != nil {
+			return err
+		}
+		f.Close()
 		log.Println("starting a pgit project!!")
 		return nil
 	},

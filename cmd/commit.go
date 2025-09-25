@@ -4,11 +4,13 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +32,7 @@ var commitCmd = &cobra.Command{
 	},
 }
 
-func NewCommit(msg string) (oid string, err error) {
+func NewCommit(msg string) (commitOid string, err error) {
 	treeOid, err := writeTree(".")
 	if err != nil {
 		return "", fmt.Errorf("failed to write tree: (error: %w)", err)
@@ -47,7 +49,7 @@ func NewCommit(msg string) (oid string, err error) {
 	buf.WriteString("\n")
 	buf.WriteString(msg)
 
-	oid, err = SaveHashObj(buf.Bytes())
+	oid, err := SaveHashObj(buf.Bytes())
 	if err != nil {
 		return "", fmt.Errorf("failed to save hash object: (error: %w)", err)
 	}
@@ -55,6 +57,22 @@ func NewCommit(msg string) (oid string, err error) {
 		return "", err
 	}
 	return oid, nil
+}
+
+func ExtractCommitTree(commitOid string) (treeOid string, err error) {
+	b, err := FetchFileContent(commitOid)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch file content: %w", err)
+	}
+	sc := bufio.NewScanner(bytes.NewReader(b))
+	sc.Split(bufio.ScanLines)
+	for sc.Scan() {
+		sep := strings.Split(sc.Text(), " ")
+		if sep[0] == "tree" {
+			return sep[1], nil
+		}
+	}
+	return "", ErrNotFound
 }
 
 // HEAD represetns the latest commit, so the HEAD file always has one oid.

@@ -96,7 +96,7 @@ func updateRef(ref string, oid string) error {
 }
 
 func getOidFromRef(ref string) (oid string, err error) {
-	if ref == "" {
+	if ref == "" || ref == "@" {
 		ref = RefHEAD
 	}
 	f, err := os.Open(filepath.Join(PgitDir, RefDir, TagDir, ref))

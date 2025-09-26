@@ -20,12 +20,13 @@ var ErrNotFound = errors.New("not found")
 var logCmd = &cobra.Command{
 	Use:   "log",
 	Short: "print commit log list",
+	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		var start string
-		if len(args) > 0 {
-			start = args[0]
+		var ref string
+		if len(args) == 1 {
+			ref = args[0]
 		}
-		err := CommitList(start)
+		err := CommitList(ref)
 		if err != nil {
 			return err
 		}
@@ -33,13 +34,13 @@ var logCmd = &cobra.Command{
 	},
 }
 
-// priting commit history, the list of commit oid starting from the startOid to the initial commit
-func CommitList(startOid string) error {
-	var err error
-	if startOid == "" {
-		startOid, err = getOidFromRef(RefHEAD)
-		if err != nil {
-			return fmt.Errorf("failed to get an oid for HEAD: %w", err)
+// priting commit history, namely the list of commit oids
+// starting from the provided ref to the initial commit
+func CommitList(ref string) error {
+	startOid, err := getOidFromRef(ref)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			startOid = ref
 		}
 	}
 	parent, err := commitParent(startOid)

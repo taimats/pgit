@@ -499,11 +499,21 @@ func loadAndSetFiles(srcDir string, pattern string, targetDir string) (paths []s
 }
 
 func TestLog(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+			{
+				desc: "02_with @ ailias",
+				args: []string{"@"},
 				out:  newWantOutput("", []output{}),
 			},
 		}
@@ -514,15 +524,22 @@ func TestLog(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oid, err := cmd.NewCommit("test message")
+				if err != nil {
+					t.Fatal(err)
+				}
+				tt.out = newWantOutput(fmt.Sprintf("%s\n", oid), []output{})
 
 				stdout, err := execCmd(t, cmd.LogCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
-				if stdout == "" {
-					t.Errorf("stdout should not be empty")
-				}
+				assertOutput(t, stdout, tt.out)
 			})
 		}
 	})

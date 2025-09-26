@@ -605,14 +605,22 @@ func TestCheckout(t *testing.T) {
 }
 
 func TestTag(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
-				desc: "01_HEAD",
+				desc: "01_all well done",
+				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+			{
+				desc: "02_no oid",
 				args: []string{"test"},
-				out: newWantOutput("", []output{
-					{fileType: "file", path: filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "test")},
-				}),
+				out:  newWantOutput("", []output{}),
 			},
 		}
 		for _, tt := range tests {
@@ -622,6 +630,23 @@ func TestTag(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oid, err := cmd.NewCommit("test message")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(tt.args) == 0 {
+					tt.args = []string{"test", oid}
+				}
+				tt.out = newWantOutput("", []output{
+					{
+						fileType: "file",
+						path:     filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "test"),
+					},
+				})
 
 				stdout, err := execCmd(t, cmd.TagCmd, tt.args)
 
@@ -629,6 +654,52 @@ func TestTag(t *testing.T) {
 					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
 				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestK(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_printing all refs with no arg",
+				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "tag")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oid, err := cmd.NewCommit("test message")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"test", oid}); err != nil {
+					t.Fatal(err)
+				}
+
+				stdout, err := execCmd(t, cmd.KCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				if stdout == "" {
+					t.Errorf("stdout should not be empty")
+				}
 			})
 		}
 	})

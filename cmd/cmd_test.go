@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -669,13 +670,13 @@ func TestK(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_printing all refs with no arg",
-				args: []string{},
+				args: []string{"second"},
 				out:  newWantOutput("", []output{}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				rootPath := joinTestDir(t, "tag")
+				rootPath := joinTestDir(t, "k")
 				initPgitForTest(t)
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
@@ -684,22 +685,35 @@ func TestK(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				oid, err := cmd.NewCommit("test message")
+				foid, err := cmd.NewCommit("first commit")
 				if err != nil {
 					t.Fatal(err)
 				}
-				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"test", oid}); err != nil {
+				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"first", foid}); err != nil {
 					t.Fatal(err)
 				}
+				if err := os.Remove("./k.go"); err != nil {
+					t.Fatal(err)
+				}
+				soid, err := cmd.NewCommit("second commit")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"second", soid}); err != nil {
+					t.Fatal(err)
+				}
+				var buf strings.Builder
+				fmt.Fprintf(&buf, "%s -> %s\n", "second", soid)
+				fmt.Fprintf(&buf, "%s -> %s\n", "first", foid)
+				fmt.Fprintln(&buf, "")
+				tt.out = newWantOutput(buf.String(), []output{})
 
 				stdout, err := execCmd(t, cmd.KCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
-				if stdout == "" {
-					t.Errorf("stdout should not be empty")
-				}
+				assertOutput(t, stdout, tt.out)
 			})
 		}
 	})

@@ -30,7 +30,7 @@ var initCmd = &cobra.Command{
 		if err := os.MkdirAll(filepath.Join(RooDir, PgitDir, RefDir, HeadDir), os.ModeDir); err != nil {
 			return err
 		}
-		f, err := os.Create(filepath.Join(RooDir, PgitDir, RefDir, TagDir, RefHEAD))
+		f, err := os.Create(filepath.Join(RooDir, PgitDir, RefHEAD))
 		if err != nil {
 			return err
 		}

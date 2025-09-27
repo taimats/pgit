@@ -10,6 +10,7 @@ const (
 	ObjDir  = "objects"
 	RefDir  = "refs"
 	TagDir  = "tags"
+	HeadDir = "heads"
 )
 
 const (

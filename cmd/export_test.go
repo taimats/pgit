@@ -12,6 +12,7 @@ var (
 	CheckoutCmd   = checkoutCmd
 	TagCmd        = tagCmd
 	KCmd          = kCmd
+	BranchCmd     = branchCmd
 )
 
 //The rest other than commands

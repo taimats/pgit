@@ -75,8 +75,9 @@ func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 	return "", ErrNotFound
 }
 
-// Ref is a shorthand for reference, and is virtually equivalent to a tag.
-// In a nutshell, both are responsible for attaching a name to a specific oid (object ID).
+// Ref is a shorthand for reference, and it is responsible for attaching a name to a specific oid (object ID).
+// Ref is classified in two ways: tag or branch. Tag represents a commit oid and branch a HEAD alias.
+// The real stuff of tag and branch is just a file in each directory, /refs/tags/{file} and /refs/heads/{file}.
 func updateRef(ref string, oid string) error {
 	if oid == "" {
 		headOid, err := getOidFromRef(RefHEAD)

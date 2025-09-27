@@ -191,6 +191,7 @@ func TestInitCMD(t *testing.T) {
 					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir)},
 					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir)},
 					{"file", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "HEAD")},
+					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.HeadDir)},
 				}),
 			},
 		}
@@ -709,6 +710,49 @@ func TestK(t *testing.T) {
 				tt.out = newWantOutput(buf.String(), []output{})
 
 				stdout, err := execCmd(t, cmd.KCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestBranch(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmdDir := filepath.Dir(cwd)
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all set",
+				args: []string{"test"},
+				out: newWantOutput("", []output{
+					{fileType: "file", path: filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.HeadDir, "test")},
+				}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "branch")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = cmd.NewCommit("test message")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				stdout, err := execCmd(t, cmd.BranchCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)

@@ -2,7 +2,10 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 )
 
 const (
@@ -24,4 +27,18 @@ func CheckPgitInit() error {
 		return ErrNeedPgitInit
 	}
 	return nil
+}
+
+// Return all the content of a file
+func ReadAllFileContent(path string) (content []byte, err error) {
+	f, err := os.Open(filepath.Clean(path))
+	if err != nil {
+		return nil, fmt.Errorf("ReadAllFileContent failed to open a file: %w", err)
+	}
+	defer f.Close()
+	content, err = io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("ReadAllFileContent failed to readAll a file: %w", err)
+	}
+	return content, nil
 }

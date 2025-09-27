@@ -35,11 +35,11 @@ var commitCmd = &cobra.Command{
 func NewCommit(msg string) (commitOid string, err error) {
 	treeOid, err := writeTree(".")
 	if err != nil {
-		return "", fmt.Errorf("failed to write tree: (error: %w)", err)
+		return "", fmt.Errorf("NewCommit failed to write tree: %w", err)
 	}
-	head, err := getOidFromRef(RefHEAD)
+	head, err := getHeadOid()
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("NewCommit failed to getHeadOid: %w", err)
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %s\n", ObjTypeTree, treeOid)
@@ -114,6 +114,14 @@ func getOidFromRef(ref string) (oid string, err error) {
 		return "", err
 	}
 	return string(b), nil
+}
+
+func getHeadOid() (oid string, err error) {
+	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefHEAD))
+	if err != nil {
+		return "", fmt.Errorf("getHeadOid func error: %w", err)
+	}
+	return string(c), nil
 }
 
 var message string

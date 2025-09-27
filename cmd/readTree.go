@@ -27,7 +27,7 @@ var readTreeCmd = &cobra.Command{
 		oid := args[0]
 		treeContent, err := FetchFileContent(oid)
 		if err != nil {
-			return fmt.Errorf("failed to find a tree content: (error: %s)", err)
+			return fmt.Errorf("no tree content: %w", err)
 		}
 		sc := bufio.NewScanner(bytes.NewReader(treeContent))
 		sc.Split(bufio.ScanLines)

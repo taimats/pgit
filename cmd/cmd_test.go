@@ -294,54 +294,37 @@ func TestWriteTree(t *testing.T) {
 		t.Fatal(err)
 	}
 	cmdDir := filepath.Dir(cwd)
-	fps, err := filepath.Glob(filepath.Join(cmdDir, "*.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	var buf bytes.Buffer
-	for _, fp := range fps {
-		f, err := os.Open(fp)
-		if err != nil {
-			t.Fatal(err)
-		}
-		defer f.Close()
-		b, err := io.ReadAll(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, oid := newBlobObj(t, b)
-		baseName := filepath.Base(fp)
-		fmt.Fprintf(&buf, "%s %s %s\n", cmd.ObjTypeBlob, oid, baseName) //e.g. "blob oid hoge.txt"
-
-		testFile, err := os.Create(filepath.Join(cwd, baseName))
-		if err != nil {
-			t.Fatal(err)
-		}
-		testFile.Write(b)
-		defer testFile.Close()
-	}
-	treePath, _ := newBlobObj(t, buf.Bytes())
-	wantOutput := newWantOutput("", []output{{"file", treePath}})
-
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
-				out:  wantOutput,
+				out:  newWantOutput("", []output{}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "readTree")
 				initPgitForTest(t)
 				t.Cleanup(func() {
-					removePgitDirForTest(t)
+					leaveTestDir(t, rootPath)
 				})
+				paths, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
 
 				stdout, err := execCmd(t, cmd.WriteTreeCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				ents, err := os.ReadDir(filepath.Join(cmd.PgitDir, cmd.ObjDir))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if len(ents) != len(paths)+1 {
+					t.Errorf("file num Not equal: (gotNum: %d, wantNum: %d)", len(ents), len(paths)+1)
 				}
 				assertOutput(t, stdout, tt.out)
 			})
@@ -350,55 +333,31 @@ func TestWriteTree(t *testing.T) {
 }
 
 func TestReadTree(t *testing.T) {
-	//setting up temporary files in the test directory
 	cwd, err := os.Getwd()
 	if err != nil {
 		t.Fatal(err)
 	}
 	cmdDir := filepath.Dir(cwd)
-	fps, err := filepath.Glob(filepath.Join(cmdDir, "*.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	outs := make([]output, 0, len(fps))
-	for _, fp := range fps {
-		f, err := os.Open(fp)
-		if err != nil {
-			t.Fatal(err)
-		}
-		b, err := io.ReadAll(f)
-		if err != nil {
-			t.Fatal(err)
-		}
-		f.Close()
-		baseName := filepath.Base(fp)
-		testFile, err := os.Create(filepath.Join(cwd, baseName))
-		if err != nil {
-			t.Fatal(err)
-		}
-		testFile.Write(b)
-		testFile.Close()
-
-		outs = append(outs, output{
-			fileType: "file",
-			path:     filepath.Join(cwd, baseName),
-		})
-	}
-
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
 				args: []string{},
-				out:  newWantOutput("", outs),
+				out:  newWantOutput("", []output{}),
 			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "readTree")
 				initPgitForTest(t)
-				t.Cleanup(func() { removePgitDirForTest(t) })
-
-				oid, err := cmd.WriteTree(".")
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oid, err := cmd.WriteTree(rootPath)
 				if err != nil {
 					t.Fatal(err)
 				}

@@ -6,9 +6,7 @@ package cmd
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"io/fs"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -18,16 +16,13 @@ import (
 // writeTreeCmd represents the writeTree command
 var writeTreeCmd = &cobra.Command{
 	Use:   "write-tree",
-	Short: "turn a directory into a tree object and save it",
+	Short: "turn the current directory into a tree object and save it",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		err := CheckPgitInit()
 		if err != nil {
 			return err
 		}
 		rootPath := "."
-		if len(args) > 0 {
-			rootPath = args[0]
-		}
 		oid, err := saveTree(filepath.Clean(rootPath))
 		if err != nil {
 			return fmt.Errorf("failed to write tree: %w", err)
@@ -68,17 +63,12 @@ func writeTree(rootPath string) (treeOid string, err error) {
 			if err != nil {
 				return err
 			}
-			if _, err := fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, d.Name()); err != nil {
+			if _, err := fmt.Fprintf(&buf, "%s %s %s\n", ObjTypeTree, oid, d.Name()); err != nil {
 				return err
 			}
 			return nil
 		}
-		f, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("writeTree: %w", err)
-		}
-		defer f.Close()
-		b, err := io.ReadAll(f)
+		b, err := ReadAllFileContent(path)
 		if err != nil {
 			return fmt.Errorf("writeTree: %w", err)
 		}

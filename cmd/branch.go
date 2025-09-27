@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
@@ -32,13 +31,9 @@ func NewBranch(name string) (path string, err error) {
 		return "", fmt.Errorf("NewBranch: %w", err)
 	}
 	path = filepath.Join(PgitDir, RefDir, HeadDir, name)
-	f, err := os.Create(path)
-	if err != nil {
+	if err := WriteFile(path, []byte(headOid)); err != nil {
 		return "", fmt.Errorf("NewBranch: %w", err)
 	}
-	defer f.Close()
-
-	f.WriteString(headOid)
 	return path, nil
 }
 

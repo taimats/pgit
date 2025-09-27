@@ -34,11 +34,11 @@ var commitCmd = &cobra.Command{
 func NewCommit(msg string) (commitOid string, err error) {
 	treeOid, err := writeTree(".")
 	if err != nil {
-		return "", fmt.Errorf("NewCommit failed to write tree: %w", err)
+		return "", fmt.Errorf("NewCommit: %w", err)
 	}
 	head, err := getHeadOid()
 	if err != nil {
-		return "", fmt.Errorf("NewCommit failed to getHeadOid: %w", err)
+		return "", fmt.Errorf("NewCommit: %w", err)
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %s\n", ObjTypeTree, treeOid)
@@ -50,10 +50,10 @@ func NewCommit(msg string) (commitOid string, err error) {
 
 	oid, err := SaveHashObj(buf.Bytes())
 	if err != nil {
-		return "", fmt.Errorf("failed to save hash object: (error: %w)", err)
+		return "", fmt.Errorf("NewCommit: %w", err)
 	}
 	if err := updateRef(RefHEAD, oid); err != nil {
-		return "", err
+		return "", fmt.Errorf("NewCommit: %w", err)
 	}
 	return oid, nil
 }
@@ -61,7 +61,7 @@ func NewCommit(msg string) (commitOid string, err error) {
 func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 	b, err := FetchFileContent(commitOid)
 	if err != nil {
-		return "", fmt.Errorf("ExtractCommitTree func error: %w", err)
+		return "", fmt.Errorf("ExtractCommitTree: %w", err)
 	}
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	sc.Split(bufio.ScanLines)
@@ -71,7 +71,7 @@ func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 			return sep[1], nil
 		}
 	}
-	return "", ErrNotFound
+	return "", nil
 }
 
 // Ref is a shorthand for reference, and it is responsible for attaching a name to a specific oid (object ID).

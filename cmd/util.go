@@ -41,3 +41,15 @@ func ReadAllFileContent(path string) (content []byte, err error) {
 	}
 	return content, nil
 }
+
+// Create a new file with a content written in it
+// Note that an append write feature is not implemented
+func WriteFile(path string, content []byte) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("WriteFile: %w", err)
+	}
+	defer f.Close()
+	f.Write(content)
+	return nil
+}

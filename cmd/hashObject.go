@@ -90,17 +90,13 @@ func IssueObjID(data []byte) (oid string) {
 	return oid
 }
 
-// covert bytes to object and save it under object storage(="rootDir/.pgit/objects/")
+// covert bytes to object and save it under object storage(="rootDir/.pgit/objects/{oid}")
 func SaveHashObj(content []byte) (oid string, err error) {
 	obj := NewObject("blob", IdentBlob, content)
 	oid = IssueObjID(obj.Encode())
-	f, err := os.Create(filepath.Join(PgitDir, ObjDir, oid))
-	if err != nil {
+	if err := WriteFile(filepath.Join(PgitDir, ObjDir, oid), content); err != nil {
 		return "", fmt.Errorf("SaveHashObj: %w", err)
 	}
-	f.Write(content)
-	f.Close()
-
 	return oid, nil
 }
 

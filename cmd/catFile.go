@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 
@@ -31,20 +30,15 @@ var catFileCmd = &cobra.Command{
 
 // search the path /.pgit/objects/{oid} for the content of a file
 func FetchFileContent(oid string) ([]byte, error) {
-	f, err := os.Open(filepath.Join(PgitDir, ObjDir, oid))
+	c, err := ReadAllFileContent(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {
 		if _, ok := err.(*os.PathError); ok {
-			return nil, fmt.Errorf("FetchFileContent: no such an oid")
+			return nil, fmt.Errorf("FetchFileContent: no such an oid: %w", err)
 		} else {
-			return nil, fmt.Errorf("FetchFileContent: %w", err)
+			return nil, err
 		}
 	}
-	defer f.Close()
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return nil, fmt.Errorf("FetchFileContent: %w", err)
-	}
-	return b, nil
+	return c, nil
 }
 
 func init() {

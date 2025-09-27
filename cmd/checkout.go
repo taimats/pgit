@@ -4,6 +4,8 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +19,9 @@ var checkoutCmd = &cobra.Command{
 		treeOid, err := ExtractCommitTree(commitOid)
 		if err != nil {
 			return err
+		}
+		if treeOid == "" {
+			return fmt.Errorf("no tree oid")
 		}
 		if err := readTreeCmd.RunE(readTreeCmd, []string{treeOid}); err != nil {
 			return err

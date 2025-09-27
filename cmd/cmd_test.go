@@ -304,7 +304,7 @@ func TestWriteTree(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				rootPath := joinTestDir(t, "readTree")
+				rootPath := joinTestDir(t, "writeTree")
 				initPgitForTest(t)
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)

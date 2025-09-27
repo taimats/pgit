@@ -101,13 +101,13 @@ func getOidFromRef(ref string) (oid string, err error) {
 	if ref == "" || ref == "@" || ref == RefHEAD {
 		c, err := getHeadOid()
 		if err != nil {
-			return "", fmt.Errorf("getOidFrom func error: %w", err)
+			return "", fmt.Errorf("getOidFromRef: %w", err)
 		}
 		return string(c), nil
 	}
 	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefDir, TagDir, ref))
 	if err != nil {
-		return "", fmt.Errorf("getOidFrom func error: %w", err)
+		return "", fmt.Errorf("getOidFromRef: %w", err)
 	}
 	return string(c), nil
 }
@@ -115,7 +115,7 @@ func getOidFromRef(ref string) (oid string, err error) {
 func getHeadOid() (oid string, err error) {
 	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefHEAD))
 	if err != nil {
-		return "", fmt.Errorf("getHeadOid func error: %w", err)
+		return "", fmt.Errorf("getHeadOid: %w", err)
 	}
 	return string(c), nil
 }

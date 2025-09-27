@@ -71,7 +71,7 @@ func sweepDir(rootPath string) error {
 		return nil
 	})
 	if err != nil {
-		return err
+		return fmt.Errorf("sweepDir: %w", err)
 	}
 	return nil
 }

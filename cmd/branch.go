@@ -4,6 +4,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -28,12 +29,12 @@ var branchCmd = &cobra.Command{
 func NewBranch(name string) (path string, err error) {
 	headOid, err := getOidFromRef(RefHEAD)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("NewBranch: %w", err)
 	}
 	path = filepath.Join(PgitDir, RefDir, HeadDir, name)
 	f, err := os.Create(path)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("NewBranch: %w", err)
 	}
 	defer f.Close()
 

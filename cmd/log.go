@@ -39,11 +39,11 @@ var logCmd = &cobra.Command{
 func CommitList(ref string) error {
 	startOid, err := getOidFromRef(ref)
 	if err != nil {
-		return fmt.Errorf("CommitList func error: %w", err)
+		return fmt.Errorf("CommitList: %w", err)
 	}
 	parent, err := commitParent(startOid)
 	if err != nil {
-		return fmt.Errorf("CommitList func error: %w", err)
+		return fmt.Errorf("CommitList: %w", err)
 	}
 	if parent == "" {
 		fmt.Println(startOid)
@@ -67,12 +67,9 @@ func CommitList(ref string) error {
 }
 
 func commitParent(oid string) (parentOid string, err error) {
-	if oid == "" {
-		return "", fmt.Errorf("commitParent error: oid is empty")
-	}
 	c, err := ReadAllFileContent(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {
-		return "", fmt.Errorf("commitParent func error: %w", err)
+		return "", fmt.Errorf("commitParent: %w", err)
 	}
 	sc := bufio.NewScanner(bytes.NewReader(c))
 	sc.Split(bufio.ScanLines)

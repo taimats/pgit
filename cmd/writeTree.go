@@ -41,7 +41,7 @@ var writeTreeCmd = &cobra.Command{
 func saveTree(rootPath string) (oid string, err error) {
 	oid, err = writeTree(rootPath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("saveTree: %w", err)
 	}
 	return oid, nil
 }
@@ -66,7 +66,7 @@ func writeTree(rootPath string) (treeOid string, err error) {
 		if d.IsDir() {
 			oid, err := writeTree(path)
 			if err != nil {
-				return fmt.Errorf("failed to handle dir: %w\n{ path: %s }", err, path)
+				return err
 			}
 			if _, err := fmt.Fprintf(&buf, "%s %s %s\n", "tree", oid, d.Name()); err != nil {
 				return err
@@ -75,26 +75,26 @@ func writeTree(rootPath string) (treeOid string, err error) {
 		}
 		f, err := os.Open(path)
 		if err != nil {
-			return fmt.Errorf("failed to open a file: %w", err)
+			return fmt.Errorf("writeTree: %w", err)
 		}
 		defer f.Close()
 		b, err := io.ReadAll(f)
 		if err != nil {
-			return fmt.Errorf("failed to read a file: %w", err)
+			return fmt.Errorf("writeTree: %w", err)
 		}
 		oid, err := SaveHashObj(b)
 		if err != nil {
-			return err
+			return fmt.Errorf("writeTree: %w", err)
 		}
 		fmt.Fprintf(&buf, "%s %s %s\n", ObjTypeBlob, oid, d.Name())
 		return nil
 	})
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("writeTree: %w", err)
 	}
 	treeOid, err = SaveHashObj(buf.Bytes())
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("writeTree: %w", err)
 	}
 	return treeOid, nil
 }

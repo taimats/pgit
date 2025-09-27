@@ -33,12 +33,16 @@ var catFileCmd = &cobra.Command{
 func FetchFileContent(oid string) ([]byte, error) {
 	f, err := os.Open(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {
-		return nil, fmt.Errorf("no such an object ID in storage")
+		if _, ok := err.(*os.PathError); ok {
+			return nil, fmt.Errorf("FetchFileContent: no such an oid")
+		} else {
+			return nil, fmt.Errorf("FetchFileContent: %w", err)
+		}
 	}
 	defer f.Close()
 	b, err := io.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("FetchFileContent: %w", err)
 	}
 	return b, nil
 }

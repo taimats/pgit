@@ -134,7 +134,7 @@ func OidRefMap() (map[string]string, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("OidRefMap: %w", err)
 	}
 	return m, nil
 }

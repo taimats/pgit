@@ -96,7 +96,7 @@ func SaveHashObj(content []byte) (oid string, err error) {
 	oid = IssueObjID(obj.Encode())
 	f, err := os.Create(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {
-		return "", fmt.Errorf("failed to create a file: (error: %w)", err)
+		return "", fmt.Errorf("SaveHashObj: %w", err)
 	}
 	f.Write(content)
 	f.Close()

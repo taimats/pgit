@@ -45,12 +45,11 @@ func CommitList(ref string) error {
 	}
 	parent, err := commitParent(startOid)
 	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			fmt.Println(startOid)
-			return nil
-		} else {
-			return err
-		}
+		return err
+	}
+	if parent == "" {
+		fmt.Println(startOid)
+		return nil
 	}
 	var buf strings.Builder
 	fmt.Fprintf(&buf, "%s\n", startOid)
@@ -58,11 +57,10 @@ func CommitList(ref string) error {
 	for {
 		parent, err = commitParent(parent)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				break
-			} else {
-				return err
-			}
+			return err
+		}
+		if parent == "" {
+			break
 		}
 		fmt.Fprintf(&buf, "%s\n", parent)
 	}
@@ -85,7 +83,7 @@ func commitParent(oid string) (parentOid string, err error) {
 			return sep[1], nil
 		}
 	}
-	return "", ErrNotFound
+	return "", nil
 }
 
 func init() {

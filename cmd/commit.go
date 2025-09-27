@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -62,7 +61,7 @@ func NewCommit(msg string) (commitOid string, err error) {
 func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 	b, err := FetchFileContent(commitOid)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch file content: %w", err)
+		return "", fmt.Errorf("ExtractCommitTree func error: %w", err)
 	}
 	sc := bufio.NewScanner(bytes.NewReader(b))
 	sc.Split(bufio.ScanLines)
@@ -79,12 +78,14 @@ func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 // Ref is classified in two ways: tag or branch. Tag represents a commit oid and branch a HEAD alias.
 // The real stuff of tag and branch is just a file in each directory, /refs/tags/{file} and /refs/heads/{file}.
 func updateRef(ref string, oid string) error {
-	if oid == "" {
-		headOid, err := getOidFromRef(RefHEAD)
+	if ref == RefHEAD || ref == "" {
+		f, err := os.Create(filepath.Join(PgitDir, RefHEAD))
 		if err != nil {
-			return err
+			return fmt.Errorf("updateRef: os.Create %w", err)
 		}
-		oid = headOid
+		defer f.Close()
+		f.WriteString(oid)
+		return nil
 	}
 	f, err := os.Create(filepath.Join(PgitDir, RefDir, TagDir, ref))
 	if err != nil {
@@ -97,23 +98,18 @@ func updateRef(ref string, oid string) error {
 }
 
 func getOidFromRef(ref string) (oid string, err error) {
-	if ref == "" || ref == "@" {
-		ref = RefHEAD
-	}
-	f, err := os.Open(filepath.Join(PgitDir, RefDir, TagDir, ref))
-	if err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			return "", ErrNotFound
-		} else {
-			return "", err
+	if ref == "" || ref == "@" || ref == RefHEAD {
+		c, err := getHeadOid()
+		if err != nil {
+			return "", fmt.Errorf("getOidFrom func error: %w", err)
 		}
+		return string(c), nil
 	}
-	defer f.Close()
-	b, err := io.ReadAll(f)
+	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefDir, TagDir, ref))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("getOidFrom func error: %w", err)
 	}
-	return string(b), nil
+	return string(c), nil
 }
 
 func getHeadOid() (oid string, err error) {

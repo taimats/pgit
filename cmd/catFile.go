@@ -29,7 +29,7 @@ var catFileCmd = &cobra.Command{
 	},
 }
 
-// search object storage for the content of a file by an object ID
+// search the path /.pgit/objects/{oid} for the content of a file
 func FetchFileContent(oid string) ([]byte, error) {
 	f, err := os.Open(filepath.Join(PgitDir, ObjDir, oid))
 	if err != nil {

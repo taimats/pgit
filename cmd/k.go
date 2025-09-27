@@ -105,6 +105,7 @@ func (n *RefNode) PrintTree() string {
 	return buf.String()
 }
 
+// creating {key: oid, value: ref} map
 func OidRefMap() (map[string]string, error) {
 	m := make(map[string]string)
 	rootdir := filepath.Join(PgitDir, RefDir, TagDir)
@@ -117,9 +118,6 @@ func OidRefMap() (map[string]string, error) {
 		}
 		if d.IsDir() {
 			return filepath.SkipDir
-		}
-		if d.Name() == RefHEAD {
-			return nil
 		}
 		f, err := os.Open(path)
 		if err != nil {

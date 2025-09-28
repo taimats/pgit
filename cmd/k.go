@@ -23,7 +23,7 @@ var kCmd = &cobra.Command{
 		if len(args) == 1 {
 			rootRef = args[0]
 		}
-		oid, err := getOidFromRef(rootRef)
+		oid, err := resolveRef(rootRef)
 		if err != nil {
 			return err
 		}

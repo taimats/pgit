@@ -7,7 +7,6 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -36,26 +35,30 @@ func NewCommit(msg string) (commitOid string, err error) {
 	if err != nil {
 		return "", fmt.Errorf("NewCommit: %w", err)
 	}
-	head, err := getHeadOid()
+	headOid, err := resolveHEAD()
 	if err != nil {
 		return "", fmt.Errorf("NewCommit: %w", err)
 	}
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "%s %s\n", ObjTypeTree, treeOid)
-	if head != "" {
-		fmt.Fprintf(&buf, "%s %s\n", "parent", head)
+	if headOid != "" {
+		fmt.Fprintf(&buf, "%s %s\n", "parent", headOid)
 	}
 	buf.WriteString("\n")
 	buf.WriteString(msg)
 
-	oid, err := SaveHashObj(buf.Bytes())
+	commitOid, err = SaveHashObj(buf.Bytes())
 	if err != nil {
 		return "", fmt.Errorf("NewCommit: %w", err)
 	}
-	if err := updateRef(RefHEAD, oid); err != nil {
+	ref, err := peekHEADFile()
+	if err != nil {
 		return "", fmt.Errorf("NewCommit: %w", err)
 	}
-	return oid, nil
+	if err := updateHEAD(ref, true, ""); err != nil {
+		return "", fmt.Errorf("NewCommit: %w", err)
+	}
+	return commitOid, nil
 }
 
 func ExtractCommitTree(commitOid string) (treeOid string, err error) {
@@ -78,46 +81,76 @@ func ExtractCommitTree(commitOid string) (treeOid string, err error) {
 // Ref is classified in two ways: tag or branch. Tag represents a commit oid and branch a HEAD alias.
 // The real stuff of tag and branch is just a file in each directory, /refs/tags/{file} and /refs/heads/{file}.
 func updateRef(ref string, oid string) error {
-	if ref == RefHEAD || ref == "" {
-		f, err := os.Create(filepath.Join(PgitDir, RefHEAD))
-		if err != nil {
-			return fmt.Errorf("updateRef: os.Create %w", err)
-		}
-		defer f.Close()
-		f.WriteString(oid)
-		return nil
+	if err := WriteFile(filepath.Join(PgitDir, RefDir, HeadDir, ref), []byte(oid)); err != nil {
+		return fmt.Errorf("updateRef: %w", err)
 	}
-	f, err := os.Create(filepath.Join(PgitDir, RefDir, TagDir, ref))
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	f.WriteString(oid)
 	return nil
 }
 
-func getOidFromRef(ref string) (oid string, err error) {
+// If isSymbolic is true, updateHEAD saves a symbolic ref (= ref: refs/heads/{ref}) in the HEAD file.
+// Otherwise, saves the physical oid directly.
+func updateHEAD(ref string, isSymbolic bool, oid string) error {
+	if !isSymbolic {
+		if err := WriteFile(filepath.Join(PgitDir, RefHEAD), []byte(oid)); err != nil {
+			return fmt.Errorf("updateHEAD: %w", err)
+		}
+		return nil
+	}
+	symbolic := filepath.Join(RefDir, HeadDir, ref)
+	msg := fmt.Sprintf("ref: %s <- HEAD\n", symbolic)
+	if err := WriteFile(filepath.Join(PgitDir, RefHEAD), []byte(msg)); err != nil {
+		return fmt.Errorf("updateHEAD: %w", err)
+	}
+	return nil
+}
+
+func resolveRef(ref string) (oid string, err error) {
 	if ref == "" || ref == "@" || ref == RefHEAD {
-		c, err := getHeadOid()
+		c, err := resolveHEAD()
 		if err != nil {
-			return "", fmt.Errorf("getOidFromRef: %w", err)
+			return "", fmt.Errorf("resolveRef: %w", err)
 		}
 		return string(c), nil
 	}
-	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefDir, TagDir, ref))
+	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefDir, HeadDir, ref))
 	if err != nil {
-		return "", fmt.Errorf("getOidFromRef: %w", err)
+		return "", fmt.Errorf("resolveRef: %w", err)
 	}
 	return string(c), nil
 }
 
-func getHeadOid() (oid string, err error) {
-	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefHEAD))
+func resolveHEAD() (oid string, err error) {
+	ref, err := peekHEADFile()
 	if err != nil {
-		return "", fmt.Errorf("getHeadOid: %w", err)
+		return "", fmt.Errorf("resolveHEAD: %w", err)
+	}
+	if ref == "" {
+		return "", nil
+	}
+	c, err := ReadAllFileContent(filepath.Join(PgitDir, RefDir, HeadDir, string(ref)))
+	if err != nil {
+		return "", fmt.Errorf("resolveHEAD: %w", err)
 	}
 	return string(c), nil
+}
+
+// extracting a symbolic ref path from the following content in the file:
+// ref: refs/heads/{ref} <- HEAD
+// If the returned ref is empty, peekHEADFile takes an alternative approach.
+// That is, it just reads the whole content and returns it, which is probably an oid.
+func peekHEADFile() (ref string, err error) {
+	c, err := ReadValueFromFile(filepath.Join(PgitDir, RefHEAD), []byte("ref:"))
+	if err != nil {
+		return "", fmt.Errorf("peekHEADFile: %w", err)
+	}
+	if c == nil {
+		c, err := ReadAllFileContent(filepath.Join(PgitDir, RefHEAD))
+		if err != nil {
+			return "", fmt.Errorf("peekHEADFile: %w", err)
+		}
+		return string(c), nil
+	}
+	return ref, nil
 }
 
 var message string

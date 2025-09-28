@@ -26,7 +26,7 @@ var branchCmd = &cobra.Command{
 }
 
 func NewBranch(name string) (path string, err error) {
-	headOid, err := getOidFromRef(RefHEAD)
+	headOid, err := resolveHEAD()
 	if err != nil {
 		return "", fmt.Errorf("NewBranch: %w", err)
 	}

@@ -37,7 +37,7 @@ var logCmd = &cobra.Command{
 // priting commit history, namely the list of commit oids
 // starting from the provided ref to the initial commit
 func CommitList(ref string) error {
-	startOid, err := getOidFromRef(ref)
+	startOid, err := resolveRef(ref)
 	if err != nil {
 		return fmt.Errorf("CommitList: %w", err)
 	}

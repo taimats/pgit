@@ -395,30 +395,32 @@ func TestCommit(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
-				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
+				paths, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
 				if err != nil {
 					t.Fatal(err)
 				}
-				_, err = cmd.WriteTree(rootPath)
-				if err != nil {
+				currentFileNum := len(paths)
+				if c, err := cmd.ReadAllFileContent(filepath.Join(cmd.PgitDir, cmd.RefHEAD)); err != nil {
 					t.Fatal(err)
+				} else {
+					log.Println("commit前のHEADファイルの中身:", string(c))
+				}
+
+				stdout, err := execCmd(t, cmd.CommitCmd, tt.args)
+
+				if c, err := cmd.ReadAllFileContent(filepath.Join(cmd.PgitDir, cmd.RefHEAD)); err != nil {
+					t.Fatal(err)
+				} else {
+					log.Println("commit後のHEADファイルの中身:", string(c))
+				}
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
 				ents, err := os.ReadDir(filepath.Join(rootPath, cmd.PgitDir, cmd.ObjDir))
 				if err != nil {
 					t.Fatal(err)
 				}
-				currentFileNum := len(ents)
-
-				stdout, err := execCmd(t, cmd.CommitCmd, tt.args)
-
-				if err != nil {
-					t.Errorf("error should be emtpy: (error: %s)", err)
-				}
-				afterEnts, err := os.ReadDir(filepath.Join(rootPath, cmd.PgitDir, cmd.ObjDir))
-				if err != nil {
-					t.Fatal(err)
-				}
-				gotFileNum := len(afterEnts)
+				gotFileNum := len(ents)
 				if gotFileNum != (currentFileNum + 1) {
 					t.Errorf("file num should be equal: (gotNum: %d, wantNum: %d)", gotFileNum, currentFileNum+1)
 				}
@@ -703,10 +705,6 @@ func TestBranch(t *testing.T) {
 					leaveTestDir(t, rootPath)
 				})
 				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = cmd.NewCommit("test message")
 				if err != nil {
 					t.Fatal(err)
 				}

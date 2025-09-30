@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"path/filepath"
 )
 
 var (
@@ -56,13 +57,13 @@ func IssueObjID(data []byte) (oid string) {
 	return oid
 }
 
-// converts content in byte into a blob object and
+// converts content in byte into a blob object under the hood, and
 // save it as a file with an oid in the target directory
-// e.g. { targetDir: .pgit/objects, savedfile: .pgit/objects/{oid} }
-func SaveBlobObj(targetDir string, content []byte) (oid string, err error) {
+// e.g. { dirPath: .pgit/objects, savedfile: .pgit/objects/{oid} }
+func SaveBlobObj(dirPath string, content []byte) (oid string, err error) {
 	obj := NewObject(ObjTypeBlob, IdentBlob, content)
 	oid = IssueObjID(obj.Encode())
-	if err := WriteFile(targetDir, content); err != nil {
+	if err := WriteFile(filepath.Join(dirPath, oid), content); err != nil {
 		return "", fmt.Errorf("SaveHashObj: %w", err)
 	}
 	return oid, nil

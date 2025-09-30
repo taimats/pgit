@@ -9,7 +9,7 @@ import (
 	"github.com/taimats/pgit/data"
 )
 
-func CmpValues(t *testing.T, got any, want any) {
+func CmpStructs(t *testing.T, got any, want any) {
 	if diff := cmp.Diff(got, want); diff != "" {
 		t.Errorf("should be equal: %s", diff)
 	}
@@ -88,7 +88,7 @@ func TestNewRef(t *testing.T) {
 				if err != nil {
 					t.Errorf("should be nil: (error: %s)", err)
 				}
-				CmpValues(t, got, tt.want)
+				CmpStructs(t, got, tt.want)
 			})
 		}
 	})
@@ -121,7 +121,7 @@ func TestResolveSymbolic(t *testing.T) {
 				if err != nil {
 					t.Errorf("should be nil: (error: %s)", err)
 				}
-				CmpValues(t, got, tt.want)
+				CmpStructs(t, got, tt.want)
 			})
 		}
 	})

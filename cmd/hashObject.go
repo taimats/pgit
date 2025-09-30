@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"crypto/sha1"
-	"encoding/hex"
-	"fmt"
 	"io"
 	"log"
 	"os"
@@ -81,23 +78,6 @@ var hashObjCmd = &cobra.Command{
 		log.Printf("saved a hashed-object!!\noid: %s\n", oid)
 		return nil
 	},
-}
-
-// oid is an so-called object ID.
-func IssueObjID(data []byte) (oid string) {
-	s := sha1.Sum(data)
-	oid = hex.EncodeToString(s[:])
-	return oid
-}
-
-// covert bytes to object and save it under object storage(="rootDir/.pgit/objects/{oid}")
-func SaveHashObj(content []byte) (oid string, err error) {
-	obj := NewObject("blob", IdentBlob, content)
-	oid = IssueObjID(obj.Encode())
-	if err := WriteFile(filepath.Join(PgitDir, ObjDir, oid), content); err != nil {
-		return "", fmt.Errorf("SaveHashObj: %w", err)
-	}
-	return oid, nil
 }
 
 func init() {

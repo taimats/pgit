@@ -80,7 +80,7 @@ func (r *Ref) ResolveSymbolic(next string) (*Ref, error) {
 	var resolved *Ref
 	current := r
 	for {
-		ref, err := current.ResolveSymbolic(current.Path)
+		ref, err := NewRef(current.Next)
 		if err != nil {
 			return nil, fmt.Errorf("ResolveSymbolic: %w", err)
 		}

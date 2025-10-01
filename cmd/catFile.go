@@ -2,10 +2,10 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 // catFileCmd represents the catFile command
@@ -19,26 +19,13 @@ var catFileCmd = &cobra.Command{
 			return err
 		}
 		oid := args[0]
-		content, err := FetchFileContent(oid)
+		content, err := data.ReadAllFileContent(filepath.Join(ObjDir, oid))
 		if err != nil {
 			return fmt.Errorf("failed to fetch file content: (error: %w)", err)
 		}
 		fmt.Println(string(content))
 		return nil
 	},
-}
-
-// search the path /.pgit/objects/{oid} for the content of a file
-func FetchFileContent(oid string) ([]byte, error) {
-	c, err := ReadAllFileContent(filepath.Join(PgitDir, ObjDir, oid))
-	if err != nil {
-		if _, ok := err.(*os.PathError); ok {
-			return nil, fmt.Errorf("FetchFileContent: no such an oid: %w", err)
-		} else {
-			return nil, err
-		}
-	}
-	return c, nil
 }
 
 func init() {

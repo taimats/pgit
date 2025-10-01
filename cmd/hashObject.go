@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"bytes"
-	"io"
+	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 var (
@@ -62,14 +62,9 @@ var hashObjCmd = &cobra.Command{
 			return err
 		}
 		filename := filepath.Clean(args[0])
-		f, err := os.Open(filename)
+		content, err := data.ReadAllFileContent(filename)
 		if err != nil {
-			return err
-		}
-		defer f.Close()
-		content, err := io.ReadAll(f)
-		if err != nil {
-			return err
+			return fmt.Errorf("hash-object: internal error: %w", err)
 		}
 		oid, err := SaveHashObj(content)
 		if err != nil {

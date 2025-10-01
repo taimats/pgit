@@ -5,8 +5,10 @@ package cmd
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 // checkoutCmd represents the checkout command
@@ -15,19 +17,30 @@ var checkoutCmd = &cobra.Command{
 	Short: "gets back to the specified commit point",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		commitOid := args[0]
-		treeOid, err := ExtractCommitTree(commitOid)
+		refBranch := filepath.Join(data.RefBranchPath, args[0])
+		ref, err := data.NewRef(refBranch)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid ref name: %w", err)
 		}
-		if treeOid == "" {
-			return fmt.Errorf("no tree oid")
+		if ref.IsSymbolic {
+			ref, err = ref.ResolveSymbolic(ref.Next)
+			if err != nil {
+				return fmt.Errorf("internal error: %w", err)
+			}
 		}
-		if err := readTreeCmd.RunE(readTreeCmd, []string{treeOid}); err != nil {
-			return err
+		treeOid, err := data.ReadValueFromFile(filepath.Join(ObjDir, ref.Oid), []byte("tree"))
+		if err != nil {
+			return fmt.Errorf("internal error: %w", err)
 		}
-		if err := updateRef(RefHEAD, commitOid); err != nil {
-			return err
+		if err := data.ReadTree(string(treeOid), ObjDir, "."); err != nil {
+			return fmt.Errorf("internal error: %w", err)
+		}
+		head, err := data.NewRef(data.RefHEADPath)
+		if err != nil {
+			return fmt.Errorf("internal error: %w", err)
+		}
+		if err := head.UpdateSymbolic(refBranch); err != nil {
+			return fmt.Errorf("internal error: %w", err)
 		}
 		return nil
 	},

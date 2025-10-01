@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 var ErrNotFound = errors.New("not found")
@@ -22,52 +23,46 @@ var logCmd = &cobra.Command{
 	Short: "print commit log list",
 	Args:  cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ref := RefHEAD
+		var name string
 		if len(args) == 1 {
-			ref = args[0]
+			name = args[0]
 		}
-		err := CommitList(ref)
+		var refPath string
+		if name == data.HEADAlias || name == HEAD || name == "" {
+			refPath = filepath.Join(data.RefHEADPath)
+		} else {
+			refPath = filepath.Join(data.RefBranchPath, name)
+		}
+		ref, err := data.NewRef(refPath)
 		if err != nil {
-			return err
+			return fmt.Errorf("internal error: %w", err)
 		}
+		if ref.IsSymbolic {
+			ref, err = ref.ResolveSymbolic(ref.Next)
+			if err != nil {
+				return fmt.Errorf("internal error: %w", err)
+			}
+		}
+		var buf strings.Builder
+		current := ref.Oid
+		for {
+			fmt.Fprintf(&buf, "%s", current)
+			oid, err := commitParent(current)
+			if err != nil {
+				return fmt.Errorf("internal error: %w", err)
+			}
+			if oid == "" {
+				break
+			}
+			current = oid
+		}
+		fmt.Println(buf.String())
 		return nil
 	},
 }
 
-// priting commit history, namely the list of commit oids
-// starting from the provided ref to the initial commit
-func CommitList(ref string) error {
-	startOid, err := resolveRef(ref)
-	if err != nil {
-		return fmt.Errorf("CommitList: %w", err)
-	}
-	parent, err := commitParent(startOid)
-	if err != nil {
-		return fmt.Errorf("CommitList: %w", err)
-	}
-	if parent == "" {
-		fmt.Println(startOid)
-		return nil
-	}
-	var buf strings.Builder
-	fmt.Fprintf(&buf, "%s\n", startOid)
-	fmt.Fprintf(&buf, "%s\n", parent)
-	for {
-		parent, err = commitParent(parent)
-		if err != nil {
-			return err
-		}
-		if parent == "" {
-			break
-		}
-		fmt.Fprintf(&buf, "%s\n", parent)
-	}
-	fmt.Println(buf.String())
-	return nil
-}
-
 func commitParent(oid string) (parentOid string, err error) {
-	c, err := ReadAllFileContent(filepath.Join(PgitDir, ObjDir, oid))
+	c, err := data.ReadAllFileContent(filepath.Join(ObjDir, oid))
 	if err != nil {
 		return "", fmt.Errorf("commitParent: %w", err)
 	}
@@ -75,6 +70,9 @@ func commitParent(oid string) (parentOid string, err error) {
 	sc.Split(bufio.ScanLines)
 	for sc.Scan() {
 		sep := strings.Split(sc.Text(), " ")
+		if len(sep) < 2 {
+			continue
+		}
 		if sep[0] == "parent" {
 			return sep[1], nil
 		}

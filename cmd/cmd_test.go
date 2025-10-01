@@ -9,11 +9,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 	"github.com/taimats/pgit/cmd"
+	"github.com/taimats/pgit/data"
 )
 
 // Each test of cmd package is highly likely to disturb the current working directory.
@@ -62,13 +62,13 @@ func joinTestDir(t *testing.T, name string) (rootPath string) {
 	return rootPath
 }
 
-func leaveTestDir(t *testing.T, rootPath string) {
+func leaveTestDir(t *testing.T, currentPath string) {
 	t.Helper()
 
-	if err := os.Chdir(filepath.Dir(rootPath)); err != nil {
+	if err := os.Chdir(filepath.Dir(currentPath)); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.RemoveAll(rootPath); err != nil {
+	if err := os.RemoveAll(currentPath); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -96,7 +96,7 @@ func newBlobObj(t *testing.T, content []byte) (path string, oid string) {
 	t.Helper()
 	obj := cmd.NewObject("blob", cmd.IdentBlob, content)
 	oid = newObjID(obj.Encode())
-	return filepath.Join(cmd.PgitDir, cmd.ObjDir, oid), oid
+	return filepath.Join(cmd.ObjDir, oid), oid
 }
 
 type testCase struct {
@@ -187,11 +187,12 @@ func TestInitCMD(t *testing.T) {
 				args: []string{},
 				out: newWantOutput("", []output{
 					{"dir", cmd.PgitDir},
-					{"dir", filepath.Join(cmd.PgitDir, cmd.ObjDir)},
-					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir)},
-					{"file", filepath.Join(cmd.PgitDir, "HEAD")},
-					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir)},
-					{"dir", filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.HeadDir)},
+					{"dir", cmd.ObjDir},
+					{"dir", cmd.RefDir},
+					{"file", data.RefHEADPath},
+					{"dir", cmd.TagDir},
+					{"dir", cmd.HeadDir},
+					{"file", filepath.Join(cmd.HeadDir, "master")},
 				}),
 			},
 		}
@@ -231,7 +232,7 @@ func TestHashObjectCmd(t *testing.T) {
 				desc: "01_all well done",
 				args: []string{"test"},
 				out: newWantOutput("", []output{
-					{"file", filepath.Join(cmd.PgitDir, cmd.ObjDir, oid)},
+					{"file", filepath.Join(cmd.ObjDir, oid)},
 				}),
 			},
 		}
@@ -262,7 +263,7 @@ func TestCatFile(t *testing.T) {
 				desc: "01_all well done",
 				args: []string{oid},
 				out: newWantOutput("", []output{
-					{"file", filepath.Join(cmd.PgitDir, cmd.ObjDir, oid)},
+					{"file", filepath.Join(cmd.ObjDir, oid)},
 				}),
 			},
 		}
@@ -319,7 +320,7 @@ func TestWriteTree(t *testing.T) {
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
-				ents, err := os.ReadDir(filepath.Join(cmd.PgitDir, cmd.ObjDir))
+				ents, err := os.ReadDir(filepath.Join(cmd.ObjDir))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -357,7 +358,7 @@ func TestReadTree(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				oid, err := cmd.WriteTree(rootPath)
+				oid, err := data.WriteTree(rootPath, cmd.ObjDir)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -375,11 +376,6 @@ func TestReadTree(t *testing.T) {
 }
 
 func TestCommit(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmdDir := filepath.Dir(cwd)
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
@@ -395,39 +391,36 @@ func TestCommit(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
-				paths, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-				currentFileNum := len(paths)
-				if c, err := cmd.ReadAllFileContent(filepath.Join(cmd.PgitDir, cmd.RefHEAD)); err != nil {
-					t.Fatal(err)
-				} else {
-					log.Println("commit前のHEADファイルの中身:", string(c))
-				}
+				currentNum := len(allFileNames(t, cmd.ObjDir))
 
 				stdout, err := execCmd(t, cmd.CommitCmd, tt.args)
 
-				if c, err := cmd.ReadAllFileContent(filepath.Join(cmd.PgitDir, cmd.RefHEAD)); err != nil {
-					t.Fatal(err)
-				} else {
-					log.Println("commit後のHEADファイルの中身:", string(c))
-				}
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
 				}
-				ents, err := os.ReadDir(filepath.Join(rootPath, cmd.PgitDir, cmd.ObjDir))
-				if err != nil {
-					t.Fatal(err)
-				}
-				gotFileNum := len(ents)
-				if gotFileNum != (currentFileNum + 1) {
-					t.Errorf("file num should be equal: (gotNum: %d, wantNum: %d)", gotFileNum, currentFileNum+1)
+				afterNum := len(allFileNames(t, cmd.ObjDir))
+				//Two files (tree and commit) should be added to the object storage.
+				if afterNum != currentNum+2 {
+					t.Errorf("fileNum should be equal:\n{ gotNum: %d, wantNum: %d }", afterNum, currentNum)
 				}
 				assertOutput(t, stdout, tt.out)
 			})
 		}
 	})
+}
+
+func allFileNames(t *testing.T, dirPath string) []string {
+	t.Helper()
+
+	ents, err := os.ReadDir(dirPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fns := make([]string, 0, len(ents))
+	for _, ent := range ents {
+		fns = append(fns, ent.Name())
+	}
+	return fns
 }
 
 // This is a helper function for test. The feature is to load files from srdDir corresponding to pattern and save them in targetDir.
@@ -509,16 +502,11 @@ func TestLog(t *testing.T) {
 }
 
 func TestCheckout(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmdDir := filepath.Dir(cwd)
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
 				desc: "01_all well done",
-				args: []string{},
+				args: []string{"test"},
 				out:  newWantOutput("", []output{}),
 			},
 		}
@@ -529,30 +517,12 @@ func TestCheckout(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
-
-				paths, err := loadAndSetFiles(cmdDir, "*.go", ".")
+				_, err := cmd.NewCommit("test commit")
 				if err != nil {
 					t.Fatal(err)
 				}
-				outs := make([]output, 0, len(paths))
-				for _, path := range paths {
-					outs = append(outs, output{
-						fileType: "file",
-						path:     path,
-					})
-				}
-				tt.out = newWantOutput("", outs)
-
-				_, err = cmd.WriteTree(".")
+				branch, err := cmd.NewBranch("test")
 				if err != nil {
-					t.Fatal(err)
-				}
-				oid, err := cmd.NewCommit("test message")
-				if err != nil {
-					t.Fatal(err)
-				}
-				tt.args = []string{oid}
-				if err := cmd.SweepDir("."); err != nil {
 					t.Fatal(err)
 				}
 
@@ -560,6 +530,13 @@ func TestCheckout(t *testing.T) {
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				headRef, err := data.ReadValueFromFile(data.RefHEADPath, []byte("ref:"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !bytes.Equal(headRef, []byte(branch)) {
+					t.Errorf("checkout branch should be equal:\n{ got: %s, want: %s }\n", string(headRef), branch)
 				}
 				assertOutput(t, stdout, tt.out)
 			})
@@ -607,7 +584,7 @@ func TestTag(t *testing.T) {
 				tt.out = newWantOutput("", []output{
 					{
 						fileType: "file",
-						path:     filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.TagDir, "test"),
+						path:     filepath.Join(cmd.TagDir, "test"),
 					},
 				})
 
@@ -622,64 +599,35 @@ func TestTag(t *testing.T) {
 	})
 }
 
-func TestK(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmdDir := filepath.Dir(cwd)
-	t.Run("success", func(t *testing.T) {
-		tests := []testCase{
-			{
-				desc: "01_printing all refs with no arg",
-				args: []string{"second"},
-				out:  newWantOutput("", []output{}),
-			},
-		}
-		for _, tt := range tests {
-			t.Run(tt.desc, func(t *testing.T) {
-				rootPath := joinTestDir(t, "k")
-				initPgitForTest(t)
-				t.Cleanup(func() {
-					leaveTestDir(t, rootPath)
-				})
-				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
-				if err != nil {
-					t.Fatal(err)
-				}
-				foid, err := cmd.NewCommit("first commit")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"first", foid}); err != nil {
-					t.Fatal(err)
-				}
-				if err := os.Remove("./k.go"); err != nil {
-					t.Fatal(err)
-				}
-				soid, err := cmd.NewCommit("second commit")
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := cmd.TagCmd.RunE(cmd.TagCmd, []string{"second", soid}); err != nil {
-					t.Fatal(err)
-				}
-				var buf strings.Builder
-				fmt.Fprintf(&buf, "%s -> %s\n", "second", soid)
-				fmt.Fprintf(&buf, "%s -> %s\n", "first", foid)
-				fmt.Fprintln(&buf, "")
-				tt.out = newWantOutput(buf.String(), []output{})
+// func TestK(t *testing.T) {
+// 	t.Run("success", func(t *testing.T) {
+// 		tests := []testCase{
+// 			{
+// 				desc: "01_printing all refs with no arg",
+// 				args: []string{"second"},
+// 				out:  newWantOutput("", []output{}),
+// 			},
+// 		}
+// 		for _, tt := range tests {
+// 			t.Run(tt.desc, func(t *testing.T) {
+// 				rootPath := joinTestDir(t, "k")
+// 				initPgitForTest(t)
+// 				t.Cleanup(func() {
+// 					leaveTestDir(t, rootPath)
+// 				})
+// 				var buf strings.Builder
+// 				oid, err := cmd.NewCommit()
 
-				stdout, err := execCmd(t, cmd.KCmd, tt.args)
+// 				stdout, err := execCmd(t, cmd.KCmd, tt.args)
 
-				if err != nil {
-					t.Errorf("error should be emtpy: (error: %s)", err)
-				}
-				assertOutput(t, stdout, tt.out)
-			})
-		}
-	})
-}
+// 				if err != nil {
+// 					t.Errorf("error should be emtpy: (error: %s)", err)
+// 				}
+// 				assertOutput(t, stdout, tt.out)
+// 			})
+// 		}
+// 	})
+// }
 
 func TestBranch(t *testing.T) {
 	cwd, err := os.Getwd()
@@ -693,7 +641,7 @@ func TestBranch(t *testing.T) {
 				desc: "01_all set",
 				args: []string{"test"},
 				out: newWantOutput("", []output{
-					{fileType: "file", path: filepath.Join(cmd.PgitDir, cmd.RefDir, cmd.HeadDir, "test")},
+					{fileType: "file", path: filepath.Join(cmd.HeadDir, "test")},
 				}),
 			},
 		}

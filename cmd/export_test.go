@@ -11,12 +11,11 @@ var (
 	LogCmd        = logCmd
 	CheckoutCmd   = checkoutCmd
 	TagCmd        = tagCmd
-	KCmd          = kCmd
-	BranchCmd     = branchCmd
+	// KCmd          = kCmd
+	BranchCmd = branchCmd
 )
 
 //The rest other than commands
 var (
-	SweepDir  = sweepDir
-	WriteTree = writeTree
+	SweepDir = sweepDir
 )

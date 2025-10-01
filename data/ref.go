@@ -40,6 +40,9 @@ type Ref struct {
 // Note: If a returned Ref is nil, that means there is no such a file reffered by the path.
 // When a ref with a specified path is needed, the file should be generated beforehand in the path.
 func NewRef(path string) (*Ref, error) {
+	if filepath.Base(path) == HEADAlias {
+		path = filepath.Join(filepath.Dir(path), HEAD)
+	}
 	ref := &Ref{Path: path, IsSymbolic: false}
 	c, err := ReadAllFileContent(path)
 	if err != nil {
@@ -71,7 +74,6 @@ func (r *Ref) Update(oid string) error {
 	if err != nil {
 		return fmt.Errorf("Ref Update: %w", err)
 	}
-	r.Oid = oid
 	if err := WriteFile(ref.Path, []byte(oid)); err != nil {
 		return fmt.Errorf("Ref Update: %w", err)
 	}
@@ -80,20 +82,7 @@ func (r *Ref) Update(oid string) error {
 
 func (r *Ref) UpdateSymbolic(refPath string) error {
 	content := fmt.Sprintf("ref: %s <- HEAD\n", refPath)
-	if !r.IsSymbolic {
-		if err := WriteFile(r.Path, []byte(content)); err != nil {
-			return fmt.Errorf("Ref UpdateSymbolic: %w", err)
-		}
-		r.Oid = ""
-		r.IsSymbolic = true
-		r.Next = refPath
-		return nil
-	}
-	ref, err := r.ResolveSymbolic(r.Next)
-	if err != nil {
-		return fmt.Errorf("Ref UpdateSymbolic: %w", err)
-	}
-	if err := WriteFile(ref.Path, []byte(content)); err != nil {
+	if err := WriteFile(r.Path, []byte(content)); err != nil {
 		return fmt.Errorf("Ref UpdateSymbolic: %w", err)
 	}
 	r.Oid = ""

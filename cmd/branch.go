@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 // branchCmd represents the branch command
@@ -26,12 +27,18 @@ var branchCmd = &cobra.Command{
 }
 
 func NewBranch(name string) (path string, err error) {
-	headOid, err := resolveHEAD()
+	ref, err := data.NewRef(data.RefHEADPath)
 	if err != nil {
 		return "", fmt.Errorf("NewBranch: %w", err)
 	}
-	path = filepath.Join(PgitDir, RefDir, HeadDir, name)
-	if err := WriteFile(path, []byte(headOid)); err != nil {
+	if ref.IsSymbolic {
+		ref, err = ref.ResolveSymbolic(ref.Next)
+		if err != nil {
+			return "", fmt.Errorf("NewBranch: %w", err)
+		}
+	}
+	path = filepath.Join(HeadDir, name)
+	if err := data.WriteFile(path, []byte(ref.Oid)); err != nil {
 		return "", fmt.Errorf("NewBranch: %w", err)
 	}
 	return path, nil

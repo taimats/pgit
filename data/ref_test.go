@@ -1,6 +1,7 @@
 package data_test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"testing"
@@ -94,7 +95,7 @@ func TestNewRef(t *testing.T) {
 	})
 }
 
-func TestResolveSymbolic(t *testing.T) {
+func TestRefResolveSymbolic(t *testing.T) {
 	t.Run("sucess", func(t *testing.T) {
 		tests := []struct {
 			desc string
@@ -127,7 +128,7 @@ func TestResolveSymbolic(t *testing.T) {
 	})
 }
 
-func TestUpdate(t *testing.T) {
+func TestRefUpdate(t *testing.T) {
 	t.Run("sucess", func(t *testing.T) {
 		tests := []struct {
 			desc           string
@@ -164,6 +165,39 @@ func TestUpdate(t *testing.T) {
 					t.Errorf("should be nil: (error: %s)", err)
 				}
 				CmpFileContent(t, tt.outPath, []byte(tt.oid))
+			})
+		}
+	})
+}
+
+func TestRefUpdateSymbolic(t *testing.T) {
+	t.Run("sucess", func(t *testing.T) {
+		tests := []struct {
+			desc           string
+			sutPath        string
+			refPath        string
+			cleanupContent []byte
+		}{
+			{
+				desc:           "01_updateSymbolic",
+				sutPath:        "./test/ref/updateSymbolic",
+				refPath:        "./test/update/symbolic",
+				cleanupContent: []byte{},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				t.Cleanup(func() {
+					cleanupFileContent(t, []string{tt.sutPath}, tt.cleanupContent)
+				})
+				ref := newTestRef(t, tt.sutPath)
+
+				err := ref.UpdateSymbolic(tt.refPath)
+
+				if err != nil {
+					t.Errorf("should be nil: (error: %s)", err)
+				}
+				CmpFileContent(t, tt.sutPath, []byte(fmt.Sprintf("ref: %s <- HEAD\n", tt.refPath)))
 			})
 		}
 	})

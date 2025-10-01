@@ -20,9 +20,12 @@ const (
 )
 
 var (
+	//".pgit/refs/heads"
 	RefBranchPath = filepath.Join(PgitDirBase, RefDirBase, HeadDirBase)
-	RefTagPath    = filepath.Join(PgitDirBase, RefDirBase, TagDirBase)
-	RefHEADPath   = filepath.Join(PgitDirBase, HEAD)
+	//".pgit/refs/tags"
+	RefTagPath = filepath.Join(PgitDirBase, RefDirBase, TagDirBase)
+	//".pgit/HEAD"
+	RefHEADPath = filepath.Join(PgitDirBase, HEAD)
 )
 
 // Ref is a shorhand for reference, and its main feature is to
@@ -61,15 +64,41 @@ func (r *Ref) Update(oid string) error {
 		if err := WriteFile(r.Path, []byte(oid)); err != nil {
 			return fmt.Errorf("Ref Update: %w", err)
 		}
+		r.Oid = oid
 		return nil
 	}
 	ref, err := r.ResolveSymbolic(r.Next)
 	if err != nil {
 		return fmt.Errorf("Ref Update: %w", err)
 	}
+	r.Oid = oid
 	if err := WriteFile(ref.Path, []byte(oid)); err != nil {
 		return fmt.Errorf("Ref Update: %w", err)
 	}
+	return nil
+}
+
+func (r *Ref) UpdateSymbolic(refPath string) error {
+	content := fmt.Sprintf("ref: %s <- HEAD\n", refPath)
+	if !r.IsSymbolic {
+		if err := WriteFile(r.Path, []byte(content)); err != nil {
+			return fmt.Errorf("Ref UpdateSymbolic: %w", err)
+		}
+		r.Oid = ""
+		r.IsSymbolic = true
+		r.Next = refPath
+		return nil
+	}
+	ref, err := r.ResolveSymbolic(r.Next)
+	if err != nil {
+		return fmt.Errorf("Ref UpdateSymbolic: %w", err)
+	}
+	if err := WriteFile(ref.Path, []byte(content)); err != nil {
+		return fmt.Errorf("Ref UpdateSymbolic: %w", err)
+	}
+	r.Oid = ""
+	r.IsSymbolic = true
+	r.Next = refPath
 	return nil
 }
 
@@ -82,7 +111,7 @@ func (r *Ref) ResolveSymbolic(next string) (*Ref, error) {
 	for {
 		ref, err := NewRef(current.Next)
 		if err != nil {
-			return nil, fmt.Errorf("ResolveSymbolic: %w", err)
+			return nil, fmt.Errorf("Ref ResolveSymbolic: %w", err)
 		}
 		if !ref.IsSymbolic {
 			resolved = ref

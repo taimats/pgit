@@ -4,8 +4,6 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -13,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/taimats/pgit/data"
 )
 
 // readTreeCmd represents the readTree command
@@ -25,29 +24,8 @@ var readTreeCmd = &cobra.Command{
 			return err
 		}
 		oid := args[0]
-		treeContent, err := FetchFileContent(oid)
-		if err != nil {
-			return fmt.Errorf("no tree content: %w", err)
-		}
-		sc := bufio.NewScanner(bytes.NewReader(treeContent))
-		sc.Split(bufio.ScanLines)
-		for sc.Scan() {
-			line := sc.Bytes()
-			sep := bytes.Split(line, []byte{' '}) //separated bytes hold "objType, oid, filename"
-			if len(sep) != 3 {
-				return fmt.Errorf("invalid data: { object: %s}", sep)
-			}
-			_, oid, filename := sep[0], sep[1], sep[2]
-			fc, err := FetchFileContent(string(oid))
-			if err != nil {
-				return err
-			}
-			f, err := os.Create(filepath.Clean(string(filename)))
-			if err != nil {
-				return err
-			}
-			f.Write(fc)
-			f.Close()
+		if err := data.ReadTree(oid, ObjDir, "."); err != nil {
+			return err
 		}
 		fmt.Println("read a tree object!!")
 		return nil

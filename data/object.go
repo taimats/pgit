@@ -1,11 +1,13 @@
 package data
 
 import (
+	"bufio"
 	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"io/fs"
+	"os"
 	"path/filepath"
 )
 
@@ -129,4 +131,35 @@ func WriteTree(srcDirPath string, trgDirPath string) (treeOid string, err error)
 
 func isExcluded(baseName string) bool {
 	return baseName == PgitDirBase
+}
+
+// ReadTree reads the content of a file (= srcDirPath/{treeOid}) and
+// lays out all the files and directories in the current directory.
+func ReadTree(treeOid string, srcDirPath string, trgDirPath string) error {
+	treeFilePath := filepath.Join(srcDirPath, treeOid)
+	treeContent, err := ReadAllFileContent(treeFilePath)
+	if err != nil {
+		return fmt.Errorf("ReadTree: %w", err)
+	}
+	sc := bufio.NewScanner(bytes.NewReader(treeContent))
+	sc.Split(bufio.ScanLines)
+	for sc.Scan() {
+		line := sc.Bytes()
+		sep := bytes.Split(line, []byte{' '}) //separated bytes hold "objType, oid, filename"
+		if len(sep) < 3 {
+			return fmt.Errorf("ReadTree: invalid data: { object: %s }", sep)
+		}
+		_, oid, filename := sep[0], sep[1], sep[2]
+		fc, err := ReadAllFileContent(filepath.Join(srcDirPath, string(oid)))
+		if err != nil {
+			return fmt.Errorf("ReadTree: %w", err)
+		}
+		f, err := os.Create(filepath.Join(trgDirPath, string(filename)))
+		if err != nil {
+			return err
+		}
+		f.Write(fc)
+		f.Close()
+	}
+	return nil
 }

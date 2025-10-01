@@ -74,12 +74,11 @@ func TestWriteTree(t *testing.T) {
 			desc       string
 			srcDirPath string
 			trgDirPath string
-			treeOid    string
 		}{
 			{
 				desc:       "01_all set",
 				srcDirPath: tmdDir,
-				trgDirPath: "./test/tree/write/trg",
+				trgDirPath: "./test/tree/trg",
 			},
 		}
 		for _, tt := range tests {
@@ -110,6 +109,67 @@ func TestWriteTree(t *testing.T) {
 				fileNum := len(ents)
 				if fileNum != len(paths)+1 {
 					t.Errorf("file num should be equal: \n{ gotNum: %d, wantNum: %d }", fileNum, len(paths)+1)
+				}
+
+			})
+		}
+	})
+}
+
+func TestReadTree(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		paths, err := loadAndSetFiles(".", "*.go", tmpDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		srcDir := "./test/tree"
+		if err := os.MkdirAll(srcDir, os.ModeDir); err != nil {
+			t.Fatal(err)
+		}
+		treeOid, err := data.WriteTree(tmpDir, srcDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() {
+			os.RemoveAll(srcDir)
+		})
+		trgFileNum := len(paths)
+
+		tests := []struct {
+			desc       string
+			treeOid    string
+			srcDirPath string
+			trgDirPath string
+		}{
+			{
+				desc:       "01_all set",
+				treeOid:    treeOid,
+				srcDirPath: srcDir,
+				trgDirPath: "./test/tree/trg",
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				if err := os.MkdirAll(tt.trgDirPath, os.ModeDir); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() {
+					os.RemoveAll(tt.trgDirPath)
+				})
+
+				err := data.ReadTree(tt.treeOid, tt.srcDirPath, tt.trgDirPath)
+
+				if err != nil {
+					t.Errorf("should be nil: \n{ error: %s }", err)
+				}
+				ents, err := os.ReadDir(tt.trgDirPath)
+				if err != nil {
+					t.Fatal(err)
+				}
+				fileNum := len(ents)
+				if fileNum != trgFileNum {
+					t.Errorf("file num should be equal: \n{ gotNum: %d, wantNum: %d }", fileNum, trgFileNum)
 				}
 
 			})

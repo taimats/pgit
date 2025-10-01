@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"io/fs"
 	"path/filepath"
 )
 
@@ -50,7 +51,7 @@ func (o *Object) Data() []byte {
 	return o.data
 }
 
-// converts bytes data into sha1 hashed string
+// converts bytes data into sha1-hashed string
 func IssueObjID(data []byte) (oid string) {
 	s := sha1.Sum(data)
 	oid = hex.EncodeToString(s[:])
@@ -58,7 +59,7 @@ func IssueObjID(data []byte) (oid string) {
 }
 
 // converts content in byte into a blob object under the hood, and
-// save it as a file with an oid in the target directory
+// save it as a file with an oid in the dirPath
 // e.g. { dirPath: .pgit/objects, savedfile: .pgit/objects/{oid} }
 func SaveBlobObj(dirPath string, content []byte) (oid string, err error) {
 	obj := NewObject(ObjTypeBlob, IdentBlob, content)
@@ -67,4 +68,65 @@ func SaveBlobObj(dirPath string, content []byte) (oid string, err error) {
 		return "", fmt.Errorf("SaveHashObj: %w", err)
 	}
 	return oid, nil
+}
+
+// "Tree object" represents a directory in the whole package and the real stuff is just a file.
+// WriteTree walks through the srcDirPath and do the following things for each file (or directory):
+// ・convert each file to a hashed-object, save its oid in the trgDirPath, and record it in a new file (= tree)
+// ・if the given file is a directory, then recursively do the same
+// ・at the end, save the whole directory (i.e. srcDir) as a hashed-object (= tree object) in the trgDirPath
+func WriteTree(srcDirPath string, trgDirPath string) (treeOid string, err error) {
+	if !filepath.IsAbs(trgDirPath) {
+		trgDirPath, err = filepath.Abs(trgDirPath)
+		if err != nil {
+			return "", fmt.Errorf("WriteTree: %s", err)
+		}
+	}
+	if err != nil {
+		return "", fmt.Errorf("WriteTree: %w", err)
+	}
+	var buf bytes.Buffer
+	err = filepath.WalkDir(srcDirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == srcDirPath {
+			return nil
+		}
+		if isExcluded(d.Name()) {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			oid, err := WriteTree(path, trgDirPath)
+			if err != nil {
+				return err
+			}
+			if _, err := fmt.Fprintf(&buf, "%s %s %s\n", ObjTypeTree, oid, d.Name()); err != nil {
+				return err
+			}
+			return nil
+		}
+		b, err := ReadAllFileContent(path)
+		if err != nil {
+			return fmt.Errorf("writeTree: %w", err)
+		}
+		oid, err := SaveBlobObj(trgDirPath, b)
+		if err != nil {
+			return fmt.Errorf("writeTree: %w", err)
+		}
+		fmt.Fprintf(&buf, "%s %s %s\n", ObjTypeBlob, oid, d.Name())
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("writeTree: %w", err)
+	}
+	treeOid, err = SaveBlobObj(trgDirPath, buf.Bytes())
+	if err != nil {
+		return "", fmt.Errorf("writeTree: %w", err)
+	}
+	return treeOid, nil
+}
+
+func isExcluded(baseName string) bool {
+	return baseName == PgitDirBase
 }

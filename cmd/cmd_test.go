@@ -691,3 +691,39 @@ func TestStatus(t *testing.T) {
 		}
 	})
 }
+
+func TestReset(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_all set",
+				args: []string{"test reset"},
+				out:  newWantOutput("", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "reset")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+
+				stdout, err := execCmd(t, cmd.ResetCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+
+				oid, err := data.ReadAllFileContent(filepath.Join(data.RefBranchPath, "master"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(oid) != tt.args[0] {
+					t.Errorf("oid should be equal:\n{ got: %s, want: %s }\n", string(oid), tt.args[0])
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}

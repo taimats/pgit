@@ -14,6 +14,7 @@ var (
 	// KCmd          = kCmd
 	BranchCmd = branchCmd
 	StatusCmd = statusCmd
+	ResetCmd  = resetCmd
 )
 
 //The rest other than commands

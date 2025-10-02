@@ -13,6 +13,7 @@ var (
 	TagCmd        = tagCmd
 	// KCmd          = kCmd
 	BranchCmd = branchCmd
+	StatusCmd = statusCmd
 )
 
 //The rest other than commands

@@ -630,11 +630,6 @@ func TestTag(t *testing.T) {
 // }
 
 func TestBranch(t *testing.T) {
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	cmdDir := filepath.Dir(cwd)
 	t.Run("success", func(t *testing.T) {
 		tests := []testCase{
 			{
@@ -644,6 +639,11 @@ func TestBranch(t *testing.T) {
 					{fileType: "file", path: filepath.Join(cmd.HeadDir, "test")},
 				}),
 			},
+			{
+				desc: "02_no args",
+				args: []string{},
+				out:  newWantOutput("*master\n", []output{}),
+			},
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
@@ -652,12 +652,36 @@ func TestBranch(t *testing.T) {
 				t.Cleanup(func() {
 					leaveTestDir(t, rootPath)
 				})
-				_, err := loadAndSetFiles(cmdDir, "*.go", rootPath)
-				if err != nil {
-					t.Fatal(err)
-				}
 
 				stdout, err := execCmd(t, cmd.BranchCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy: (error: %s)", err)
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}
+
+func TestStatus(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_no args",
+				args: []string{},
+				out:  newWantOutput("on branch master\n", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "status")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+
+				stdout, err := execCmd(t, cmd.StatusCmd, tt.args)
 
 				if err != nil {
 					t.Errorf("error should be emtpy: (error: %s)", err)

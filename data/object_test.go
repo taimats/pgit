@@ -1,6 +1,7 @@
 package data_test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -175,4 +176,43 @@ func TestReadTree(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestGetCommit(t *testing.T) {
+	tests := []struct {
+		desc string
+		oid  string
+		want *data.Commit
+	}{
+		{
+			desc: "",
+			oid:  "testoid",
+			want: &data.Commit{
+				TreeOid: "testTreeOid",
+				Parent:  "testParent",
+				Msg:     "test message",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.desc, func(t *testing.T) {
+			tmpDir := filepath.Join(data.PgitDirBase, data.ObjDirBase)
+			if err := os.MkdirAll(tmpDir, os.ModeDir); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.RemoveAll(filepath.Dir(tmpDir)) })
+
+			content := fmt.Sprintf("tree %v\nparent %v\n\n%v\n", tt.want.TreeOid, tt.want.Parent, tt.want.Msg)
+			if err := data.WriteFile(filepath.Join(tmpDir, tt.oid), []byte(content)); err != nil {
+				t.Fatal(err)
+			}
+
+			got, err := data.GetCommit(tt.oid)
+
+			if err != nil {
+				t.Errorf("should be nil:\n{ error: %s }", err)
+			}
+			CmpStructs(t, got, tt.want)
+		})
+	}
 }

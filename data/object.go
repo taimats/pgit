@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 var (
@@ -162,4 +163,34 @@ func ReadTree(treeOid string, srcDirPath string, trgDirPath string) error {
 		f.Close()
 	}
 	return nil
+}
+
+type Commit struct {
+	TreeOid string
+	Parent  string
+	Msg     string
+}
+
+// Read a content of a file (= .pgit/objects/{oid}), and convert it to Commit struct.
+func GetCommit(oid string) (*Commit, error) {
+	c := &Commit{}
+	b, err := ReadAllFileContent(filepath.Join(PgitDirBase, ObjDirBase, oid))
+	if err != nil {
+		return nil, fmt.Errorf("GetCommit: %w", err)
+	}
+	sc := bufio.NewScanner(bytes.NewReader(b))
+	sc.Split(bufio.ScanLines)
+	for sc.Scan() {
+		line := sc.Text()
+		sep := strings.Split(line, " ")
+		switch sep[0] {
+		case "tree":
+			c.TreeOid = sep[1]
+		case "parent":
+			c.Parent = sep[1]
+		default:
+			c.Msg = strings.Join(sep, " ")
+		}
+	}
+	return c, nil
 }

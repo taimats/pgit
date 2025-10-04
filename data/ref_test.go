@@ -12,7 +12,7 @@ import (
 
 func CmpStructs(t *testing.T, got any, want any) {
 	if diff := cmp.Diff(got, want); diff != "" {
-		t.Errorf("should be equal: %s", diff)
+		t.Errorf("should be equal\n(-got, +want):\n%s", diff)
 	}
 }
 

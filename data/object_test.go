@@ -216,3 +216,39 @@ func TestGetCommit(t *testing.T) {
 		})
 	}
 }
+
+func TestParseTree(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []struct {
+			desc string
+			path string
+			want data.Tree
+		}{
+			{
+				desc: "01_all set",
+				path: "./test/tree/first",
+				want: data.Tree{
+					"filename1": &data.TreeElem{"blob", "oid1", "filename1", nil},
+					"second": &data.TreeElem{"tree", "second", "second", data.Tree{
+						"filename1": &data.TreeElem{"blob", "oid1", "filename1", nil},
+						"filename2": &data.TreeElem{"blob", "oid2", "filename2", nil},
+						"filename3": &data.TreeElem{"blob", "oid3", "filename3", nil},
+						"filename4": &data.TreeElem{"blob", "oid4", "filename4", nil},
+					}},
+					"filename3": &data.TreeElem{"blob", "oid3", "filename3", nil},
+					"filename4": &data.TreeElem{"blob", "oid4", "filename4", nil},
+				},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				got, err := data.ParseTree(tt.path)
+
+				if err != nil {
+					t.Errorf("should be nil: \n{ error: %s }\n", err)
+				}
+				CmpStructs(t, got, tt.want)
+			})
+		}
+	})
+}

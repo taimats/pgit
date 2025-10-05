@@ -194,3 +194,47 @@ func GetCommit(oid string) (*Commit, error) {
 	}
 	return c, nil
 }
+
+type TreeElem struct {
+	ObjType string //blob or tree
+	Oid     string
+	Name    string //filefname
+	Child   Tree
+}
+
+// { key: name, value: TreeElem }
+type Tree map[string]*TreeElem
+
+func ParseTree(path string) (Tree, error) {
+	c, err := ReadAllFileContent(path)
+	if err != nil {
+		return nil, fmt.Errorf("ParseTree: %w", err)
+	}
+	tree := make(Tree)
+	sc := bufio.NewScanner(bytes.NewReader(c))
+	sc.Split(bufio.ScanLines)
+	for sc.Scan() {
+		line := sc.Text()
+		sep := strings.Split(line, " ")
+		if len(sep) < 3 {
+			continue
+		}
+		objType, oid, name := sep[0], sep[1], sep[2]
+		elm := &TreeElem{
+			ObjType: objType,
+			Oid:     oid,
+			Name:    name,
+			Child:   nil,
+		}
+		if objType == ObjTypeTree {
+			elm.Child, err = ParseTree(filepath.Join(filepath.Dir(path), name))
+			if err != nil {
+				return nil, fmt.Errorf("ParseTree: %w", err)
+			}
+			tree[name] = elm
+			continue
+		}
+		tree[name] = elm
+	}
+	return tree, nil
+}

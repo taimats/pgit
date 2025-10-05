@@ -1,0 +1,4 @@
+blob oid1 filename1
+tree second second
+blob oid3 filename3
+blob oid4 filename4

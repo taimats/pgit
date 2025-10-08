@@ -99,28 +99,6 @@ func currentBranchName() (string, error) {
 	return filepath.Base(string(current)), nil
 }
 
-// returning all file names with any dir names excluded
-func allFileNames(dirPath string) ([]string, error) {
-	var fns []string
-	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if path == dirPath {
-			return nil
-		}
-		if d.IsDir() {
-			return filepath.SkipDir
-		}
-		fns = append(fns, d.Name())
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return fns, nil
-}
-
 func init() {
 	rootCmd.AddCommand(branchCmd)
 }

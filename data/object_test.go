@@ -226,7 +226,7 @@ func TestParseTree(t *testing.T) {
 		}{
 			{
 				desc: "01_all set",
-				path: "./test/tree/first",
+				path: "./test/parsetree/first",
 				want: data.Tree{
 					"filename1": &data.TreeElem{"blob", "oid1", "filename1", nil},
 					"second": &data.TreeElem{"tree", "second", "second", data.Tree{

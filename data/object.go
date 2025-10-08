@@ -202,9 +202,10 @@ type TreeElem struct {
 	Child   Tree
 }
 
-// { key: name, value: TreeElem }
+// { key: filename, value: TreeElem }
 type Tree map[string]*TreeElem
 
+// Parse tree files existing in the path specified, and convert them into type Tree
 func ParseTree(path string) (Tree, error) {
 	c, err := ReadAllFileContent(path)
 	if err != nil {

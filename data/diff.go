@@ -3,10 +3,36 @@ package data
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/sergi/go-diff/diffmatchpatch"
 )
+
+type Diff struct {
+	Filename string
+	Diff     string
+}
+
+// comparing two trees and generating the differences in a clear way.
+func DiffTrees(from Tree, to Tree, srcDir string) ([]*Diff, error) {
+	difs := make([]*Diff, 0, len(from)+len(to))
+	for name, fromElem := range from {
+		toElem, ok := to[name]
+		if !ok {
+			continue
+		}
+		diff, err := DiffFiles(filepath.Join(srcDir, fromElem.Oid), filepath.Join(srcDir, toElem.Oid))
+		if err != nil {
+			return nil, fmt.Errorf("DiffTrees: %w", err)
+		}
+		if diff == "" {
+			continue
+		}
+		difs = append(difs, &Diff{Filename: name, Diff: diff})
+	}
+	return difs, nil
+}
 
 // comparing the content of files between fromPath and toPath, and generating an output of differences
 func DiffFiles(fromPath string, toPath string) (diff string, err error) {

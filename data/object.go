@@ -135,7 +135,7 @@ func isExcluded(baseName string) bool {
 }
 
 // ReadTree reads the content of a file (= srcDirPath/{treeOid}) and
-// lays out all the files and directories in the current directory.
+// lays out all the files and directories in the target directory.
 func ReadTree(treeOid string, srcDirPath string, trgDirPath string) error {
 	treeFilePath := filepath.Join(srcDirPath, treeOid)
 	treeContent, err := ReadAllFileContent(treeFilePath)
@@ -206,7 +206,7 @@ type TreeElem struct {
 type Tree map[string]*TreeElem
 
 // Parse tree files existing in the path specified, and convert them into type Tree
-func ParseTree(path string) (Tree, error) {
+func ParseTreeFile(path string) (Tree, error) {
 	c, err := ReadAllFileContent(path)
 	if err != nil {
 		return nil, fmt.Errorf("ParseTree: %w", err)
@@ -228,7 +228,7 @@ func ParseTree(path string) (Tree, error) {
 			Child:   nil,
 		}
 		if objType == ObjTypeTree {
-			elm.Child, err = ParseTree(filepath.Join(filepath.Dir(path), name))
+			elm.Child, err = ParseTreeFile(filepath.Join(filepath.Dir(path), name))
 			if err != nil {
 				return nil, fmt.Errorf("ParseTree: %w", err)
 			}

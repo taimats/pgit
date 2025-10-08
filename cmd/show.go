@@ -31,11 +31,11 @@ var showCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("internal error: %w", err)
 		}
-		fromTree, err := data.ParseTree(filepath.Join(ObjDir, c.Parent))
+		fromTree, err := data.ParseTreeFile(filepath.Join(ObjDir, c.Parent))
 		if err != nil {
 			return fmt.Errorf("internal error: %w", err)
 		}
-		toTree, err := data.ParseTree(filepath.Join(ObjDir, c.TreeOid))
+		toTree, err := data.ParseTreeFile(filepath.Join(ObjDir, c.TreeOid))
 		if err != nil {
 			return fmt.Errorf("internal error: %w", err)
 		}

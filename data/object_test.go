@@ -242,7 +242,7 @@ func TestParseTree(t *testing.T) {
 		}
 		for _, tt := range tests {
 			t.Run(tt.desc, func(t *testing.T) {
-				got, err := data.ParseTree(tt.path)
+				got, err := data.ParseTreeFile(tt.path)
 
 				if err != nil {
 					t.Errorf("should be nil: \n{ error: %s }\n", err)

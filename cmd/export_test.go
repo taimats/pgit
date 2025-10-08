@@ -15,6 +15,7 @@ var (
 	BranchCmd = branchCmd
 	StatusCmd = statusCmd
 	ResetCmd  = resetCmd
+	ShowCmd   = showCmd
 )
 
 //The rest other than commands

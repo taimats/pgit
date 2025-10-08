@@ -727,3 +727,42 @@ func TestReset(t *testing.T) {
 		}
 	})
 }
+
+func TestShow(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		tests := []testCase{
+			{
+				desc: "01_without args",
+				args: []string{},
+				out:  newWantOutput("", []output{}),
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				rootPath := joinTestDir(t, "show")
+				initPgitForTest(t)
+				t.Cleanup(func() {
+					leaveTestDir(t, rootPath)
+				})
+				_, err := cmd.NewCommit("firstCommit")
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = cmd.NewCommit("secondCommit")
+				if err != nil {
+					t.Fatal(err)
+				}
+
+				stdout, err := execCmd(t, cmd.ShowCmd, tt.args)
+
+				if err != nil {
+					t.Errorf("error should be emtpy:\nerror: %s\n", err)
+				}
+				if stdout == "" {
+					t.Errorf("Stdout should not be empty")
+				}
+				assertOutput(t, stdout, tt.out)
+			})
+		}
+	})
+}

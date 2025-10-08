@@ -3,6 +3,7 @@ package data_test
 import (
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -251,4 +252,75 @@ func TestParseTree(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestGetWorkingTree(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		oids := issueAllOids(t, "./test/workingtree")
+		tests := []struct {
+			desc     string
+			rootPath string
+			want     data.Tree
+		}{
+			{
+				desc:     "01_all set",
+				rootPath: "./test/workingtree",
+				want: data.Tree{
+					"file_01": &data.TreeElem{
+						ObjType: data.ObjTypeBlob,
+						Oid:     oids[0],
+						Name:    "file_01",
+						Child:   nil,
+					},
+					"file_02": &data.TreeElem{
+						ObjType: data.ObjTypeBlob,
+						Oid:     oids[1],
+						Name:    "file_02",
+						Child:   nil,
+					},
+					"file_03": &data.TreeElem{
+						ObjType: data.ObjTypeBlob,
+						Oid:     oids[2],
+						Name:    "file_03",
+						Child:   nil,
+					},
+				},
+			},
+		}
+		for _, tt := range tests {
+			t.Run(tt.desc, func(t *testing.T) {
+				got, err := data.GetWorkingTree(tt.rootPath)
+
+				if err != nil {
+					t.Errorf("should be nil: \n{ error: %s }\n", err)
+				}
+				CmpStructs(t, got, tt.want)
+			})
+		}
+	})
+}
+
+func issueAllOids(t *testing.T, dirPath string) (oids []string) {
+	t.Helper()
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == dirPath {
+			return nil
+		}
+		if d.IsDir() {
+			return filepath.SkipDir
+		}
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		oids = append(oids, data.IssueObjID(content))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("issueAllOids: %s", err)
+	}
+	return
 }

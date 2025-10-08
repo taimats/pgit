@@ -239,3 +239,52 @@ func ParseTreeFile(path string) (Tree, error) {
 	}
 	return tree, nil
 }
+
+// The behavior of this method is quite similar to WriteTree except that this func is NOT expected to
+// save an actual tree object in the object storage (= .pgit/objects/{treeOid}). The primary goal of
+// this func is to obtain information of the working tree.
+func GetWorkingTree(rootPath string) (Tree, error) {
+	tree := make(Tree)
+	err := filepath.WalkDir(rootPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if path == rootPath {
+			return nil
+		}
+		if isExcluded(d.Name()) {
+			return filepath.SkipDir
+		}
+		if d.IsDir() {
+			name := d.Name()
+			elm := &TreeElem{
+				ObjType: ObjTypeTree,
+				Name:    name,
+			}
+			child, err := GetWorkingTree(path)
+			if err != nil {
+				return err
+			}
+			elm.Child = child
+			tree[name] = elm
+			return nil
+		}
+		name := d.Name()
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		oid := IssueObjID(content)
+		tree[name] = &TreeElem{
+			ObjType: ObjTypeBlob,
+			Oid:     oid,
+			Name:    name,
+			Child:   nil,
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("GetWorkingTree: %w", err)
+	}
+	return tree, nil
+}
